@@ -41,10 +41,36 @@ interface QueryTasksInput {
 }
 
 export class TaskService {
-  static async createTask(data: CreateTaskInput, user: CurrentUser) {
-    // 1. Check karein project exist karta hai aur user kam az kam MEMBER hai (VIEWER block ho jayega)
-    await assertProjectAccess(data.projectId, user, ProjectRole.MEMBER);
+  private static async validateAssignee(
+    projectId: string,
+    assigneeId?: string | null,
+  ) {
+    if (!assigneeId) return; // Agar null/undefined hai (unassign karna) to allow hai
+    const user = await prisma.user.findUnique({
+      where: { id: assigneeId },
+      select: { id: true, isActive: true },
+    });
+    if (!user || !user.isActive) {
+      throw new ApiError(400, "Assignee not found or user is inactive");
+    }
+    const membership = await prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId: assigneeId,
+        },
+      },
+    });
+    if (!membership) {
+      throw new ApiError(400, "Assignee must be a member of this project");
+    }
+  }
 
+  static async createTask(data: CreateTaskInput, user: CurrentUser) {
+    // Check project access & role
+    await assertProjectAccess(data.projectId, user, ProjectRole.MEMBER);
+    // Validate assignee (agar diya gaya hai)
+    await this.validateAssignee(data.projectId, data.assigneeId);
     return prisma.task.create({
       data: {
         title: data.title,
@@ -153,8 +179,13 @@ export class TaskService {
   ) {
     const task = await this.getTaskById(id, user);
 
-    // Edit karne ke liye kam az kam MEMBER hona zaroori hai (VIEWER ko 403 milega)
+    // Edit permission check
     await assertProjectAccess(task.projectId, user, ProjectRole.MEMBER);
+
+    // Validate assignee if updated
+    if (data.assigneeId !== undefined) {
+      await this.validateAssignee(task.projectId, data.assigneeId);
+    }
 
     return prisma.task.update({
       where: { id },
