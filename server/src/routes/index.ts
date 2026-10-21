@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authRoutes } from "./auth.routes.js";
+import { userRoutes } from "./user.routes.js"; // <-- Import
 import { projectRoutes } from "./project.routes.js";
 import { taskRoutes } from "./task.routes.js";
 import { notificationRoutes } from "./notification.routes.js";
@@ -24,8 +25,9 @@ router.get("/health", (req, res) => {
 
 // Mounted Versioned Resource Routes
 router.use("/auth", authRoutes);
+router.use("/users", userRoutes);
 router.use("/projects", projectRoutes);
 router.use("/tasks", taskRoutes);
-router.use("/notifications", notificationRoutes); // <-- Mount notifications
+router.use("/notifications", notificationRoutes);
 
 export const apiRouter = router;
