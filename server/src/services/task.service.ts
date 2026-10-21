@@ -1,6 +1,8 @@
 import { Prisma, Role, TaskStatus, Priority } from "@prisma/client";
 import { prisma } from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
+import { assertProjectAccess } from "../utils/projectAccess.js";
+import { ProjectRole } from "@prisma/client";
 
 interface CurrentUser {
   id: string;
@@ -40,21 +42,8 @@ interface QueryTasksInput {
 
 export class TaskService {
   static async createTask(data: CreateTaskInput, user: CurrentUser) {
-    // Check karein project exist karta hai aur user member hai
-    const project = await prisma.project.findFirst({
-      where: { id: data.projectId, isDeleted: false },
-      include: { members: true },
-    });
-
-    if (!project) throw new ApiError(404, "Project not found");
-
-    const isMember = project.members.some((m) => m.userId === user.id);
-    if (user.role !== Role.ADMIN && !isMember) {
-      throw new ApiError(
-        403,
-        "Forbidden: You are not a member of this project",
-      );
-    }
+    // 1. Check karein project exist karta hai aur user kam az kam MEMBER hai (VIEWER block ho jayega)
+    await assertProjectAccess(data.projectId, user, ProjectRole.MEMBER);
 
     return prisma.task.create({
       data: {
@@ -141,7 +130,7 @@ export class TaskService {
       include: {
         creator: { select: { id: true, name: true, email: true } },
         assignee: { select: { id: true, name: true, email: true } },
-        project: { include: { members: true } },
+        project: { select: { id: true, name: true, isDeleted: true } },
         comments: {
           include: { user: { select: { id: true, name: true, email: true } } },
           orderBy: { createdAt: "asc" },
@@ -151,10 +140,8 @@ export class TaskService {
 
     if (!task) throw new ApiError(404, "Task not found");
 
-    const isMember = task.project.members.some((m) => m.userId === user.id);
-    if (user.role !== Role.ADMIN && !isMember) {
-      throw new ApiError(403, "Forbidden: You do not have access to this task");
-    }
+    // VIEWER bhi task read kar sakta hai
+    await assertProjectAccess(task.projectId, user, ProjectRole.VIEWER);
 
     return task;
   }
@@ -164,7 +151,10 @@ export class TaskService {
     data: UpdateTaskInput,
     user: CurrentUser,
   ) {
-    await this.getTaskById(id, user);
+    const task = await this.getTaskById(id, user);
+
+    // Edit karne ke liye kam az kam MEMBER hona zaroori hai (VIEWER ko 403 milega)
+    await assertProjectAccess(task.projectId, user, ProjectRole.MEMBER);
 
     return prisma.task.update({
       where: { id },
@@ -188,7 +178,10 @@ export class TaskService {
   }
 
   static async deleteTask(id: string, user: CurrentUser) {
-    await this.getTaskById(id, user);
+    const task = await this.getTaskById(id, user);
+
+    // Delete karne ke liye kam az kam MEMBER hona zaroori hai
+    await assertProjectAccess(task.projectId, user, ProjectRole.MEMBER);
 
     await prisma.task.update({
       where: { id },

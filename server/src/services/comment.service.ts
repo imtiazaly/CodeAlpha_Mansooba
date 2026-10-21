@@ -1,6 +1,8 @@
 import { Role } from "@prisma/client";
 import { prisma } from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
+import { assertProjectAccess } from "../utils/projectAccess.js";
+import { ProjectRole } from "@prisma/client";
 
 interface CurrentUser {
   id: string;
@@ -16,18 +18,13 @@ export class CommentService {
   ) {
     const task = await prisma.task.findFirst({
       where: { id: taskId, isDeleted: false },
-      include: { project: { include: { members: true } } },
+      select: { id: true, projectId: true },
     });
 
     if (!task) throw new ApiError(404, "Task not found");
 
-    const isMember = task.project.members.some((m) => m.userId === user.id);
-    if (user.role !== Role.ADMIN && !isMember) {
-      throw new ApiError(
-        403,
-        "Forbidden: You must be a project member to comment",
-      );
-    }
+    // Comment karne ke liye kam az kam MEMBER hona zaroori hai (VIEWER comment nahi kar sakega)
+    await assertProjectAccess(task.projectId, user, ProjectRole.MEMBER);
 
     return prisma.comment.create({
       data: {
@@ -44,15 +41,13 @@ export class CommentService {
   static async getCommentsByTaskId(taskId: string, user: CurrentUser) {
     const task = await prisma.task.findFirst({
       where: { id: taskId, isDeleted: false },
-      include: { project: { include: { members: true } } },
+      select: { id: true, projectId: true },
     });
 
     if (!task) throw new ApiError(404, "Task not found");
 
-    const isMember = task.project.members.some((m) => m.userId === user.id);
-    if (user.role !== Role.ADMIN && !isMember) {
-      throw new ApiError(403, "Forbidden: Access denied");
-    }
+    // VIEWER comments read kar sakta hai
+    await assertProjectAccess(task.projectId, user, ProjectRole.VIEWER);
 
     return prisma.comment.findMany({
       where: { taskId },
@@ -70,10 +65,17 @@ export class CommentService {
   ) {
     const comment = await prisma.comment.findFirst({
       where: { id: commentId, taskId },
+      include: { task: { select: { projectId: true, isDeleted: true } } },
     });
 
-    if (!comment) throw new ApiError(404, "Comment not found");
+    if (!comment || comment.task.isDeleted) {
+      throw new ApiError(404, "Comment not found");
+    }
 
+    // Project access verify karein
+    await assertProjectAccess(comment.task.projectId, user, ProjectRole.MEMBER);
+
+    // Sirf apna comment delete kar sakte hain (unless system ADMIN)
     if (user.role !== Role.ADMIN && comment.userId !== user.id) {
       throw new ApiError(
         403,
