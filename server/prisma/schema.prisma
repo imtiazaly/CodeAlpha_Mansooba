@@ -33,6 +33,13 @@ enum Priority {
   URGENT
 }
 
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_STATUS_CHANGED
+  COMMENT_ADDED
+  PROJECT_INVITATION
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -49,6 +56,7 @@ model User {
   createdTasks    Task[]           @relation("TaskCreator")
   assignedTasks   Task[]           @relation("TaskAssignee")
   comments        Comment[]
+  notifications   Notification[]   @relation("UserNotifications")
 
   @@map("users")
 }
@@ -136,4 +144,25 @@ model Comment {
   @@index([taskId])
   @@index([userId])
   @@map("comments")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  // Kis user ko notification mila
+  userId    String
+  user      User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Optional Context IDs (Frontend direct redirect ke liye)
+  projectId String?
+  taskId    String?
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
 }
