@@ -5,6 +5,7 @@ import { apiRateLimiter } from "./middlewares/rateLimiter.middleware.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import { apiRouter } from "./routes/index.js";
 import { ApiError } from "./utils/ApiError.js";
+import { env } from "./config/env.js";
 
 const app: Application = express();
 
@@ -12,7 +13,25 @@ app.set("trust proxy", 1);
 
 // Security Middlewares
 app.use(helmet());
-app.use(cors({ origin: "*", credentials: true }));
+// CORS configuration
+const allowedOrigins = [
+  env.CLIENT_URL,
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like Postman or mobile apps)
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new ApiError(403, "Not allowed by CORS"));
+    },
+    credentials: true,
+  }),
+);
 app.use(apiRateLimiter);
 
 // Body Parsers
