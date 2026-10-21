@@ -1,19 +1,28 @@
+import http from "http";
 import app from "./app.js";
 import { env } from "./config/env.js";
 import { prisma } from "./config/db.js";
+import { initSocket } from "./config/socket.js";
 
-const server = app.listen(env.PORT, () => {
+// Create Native HTTP Server
+const httpServer = http.createServer(app);
+
+// Initialize Socket.io with HTTP Server
+initSocket(httpServer);
+
+const server = httpServer.listen(env.PORT, () => {
   console.log(
     `🚀 Server successfully started on port ${env.PORT} in ${env.NODE_ENV} mode`,
   );
   console.log(`🔗 Health Check: http://localhost:${env.PORT}/api/v1/health`);
+  console.log(`⚡ WebSocket Server is ready`);
 });
 
 // Graceful Shutdown Handler
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
   server.close(async () => {
-    console.log("🔌 HTTP Server closed.");
+    console.log("🔌 HTTP & WebSocket Server closed.");
     try {
       await prisma.$disconnect();
       console.log("🗄️ Database connection closed safely.");
@@ -24,7 +33,6 @@ const gracefulShutdown = async (signal: string) => {
     }
   });
 
-  // Force shutdown agar 10s me close na ho
   setTimeout(() => {
     console.error("⚠️ Forcefully shutting down due to timeout");
     process.exit(1);

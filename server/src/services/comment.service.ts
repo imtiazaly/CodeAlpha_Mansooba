@@ -3,6 +3,7 @@ import { prisma } from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import { assertProjectAccess } from "../utils/projectAccess.js";
 import { ProjectRole } from "@prisma/client";
+import { emitToProject } from "../config/socket.js";
 
 interface CurrentUser {
   id: string;
@@ -29,7 +30,7 @@ export class CommentService {
 
     await assertProjectAccess(task.projectId, user, ProjectRole.MEMBER);
 
-    return prisma.comment.create({
+    const comment = await prisma.comment.create({
       data: {
         content,
         taskId,
@@ -39,6 +40,11 @@ export class CommentService {
         user: { select: { id: true, name: true, email: true } },
       },
     });
+
+    // Real-Time Event: Task card mein live comment append karein
+    emitToProject(task.projectId, "comment:created", { ...comment, taskId });
+
+    return comment;
   }
 
   static async getCommentsByTaskId(taskId: string, user: CurrentUser) {
@@ -96,6 +102,12 @@ export class CommentService {
     }
 
     await prisma.comment.delete({ where: { id: commentId } });
+
+    // Real-Time Event: Live comment remove karein
+    emitToProject(comment.task.projectId, "comment:deleted", {
+      id: commentId,
+      taskId,
+    });
 
     return { id: commentId, message: "Comment deleted successfully" };
   }

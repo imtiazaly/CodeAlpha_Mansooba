@@ -1,6 +1,7 @@
 import { ProjectRole, Role } from "@prisma/client";
 import { prisma } from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
+import { emitToProject } from "../config/socket.js";
 
 interface CurrentUser {
   id: string;
@@ -141,7 +142,10 @@ export class ProjectService {
   ) {
     // Project owner role cannot be assigned via addMember
     if (role === ProjectRole.OWNER) {
-      throw new ApiError(400, "Project owner role cannot be assigned to members");
+      throw new ApiError(
+        400,
+        "Project owner role cannot be assigned to members",
+      );
     }
 
     const project = await this.getProjectById(projectId, user);
@@ -182,10 +186,15 @@ export class ProjectService {
       throw new ApiError(409, "User is already a member of this project");
     }
 
-    return prisma.projectMember.create({
+    const newMember = await prisma.projectMember.create({
       data: { projectId, userId: targetUserId, role },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+
+    // Real-Time Event: Project members list update karein
+    emitToProject(projectId, "member:added", newMember);
+
+    return newMember;
   }
 
   static async removeMember(
@@ -211,6 +220,12 @@ export class ProjectService {
 
     await prisma.projectMember.delete({
       where: { projectId_userId: { projectId, userId: targetUserId } },
+    });
+
+    // Real-Time Event: Member remove notification
+    emitToProject(projectId, "member:removed", {
+      projectId,
+      userId: targetUserId,
     });
 
     return { message: "Member successfully removed" };

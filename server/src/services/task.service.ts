@@ -3,6 +3,7 @@ import { prisma } from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import { assertProjectAccess } from "../utils/projectAccess.js";
 import { ProjectRole } from "@prisma/client";
+import { emitToProject } from "../config/socket.js";
 
 interface CurrentUser {
   id: string;
@@ -71,7 +72,7 @@ export class TaskService {
     await assertProjectAccess(data.projectId, user, ProjectRole.MEMBER);
     // Validate assignee (agar diya gaya hai)
     await this.validateAssignee(data.projectId, data.assigneeId);
-    return prisma.task.create({
+    const task = await prisma.task.create({
       data: {
         title: data.title,
         description: data.description,
@@ -88,6 +89,11 @@ export class TaskService {
         project: { select: { id: true, name: true } },
       },
     });
+
+    // Real-Time Event: Project members ko naye task ka notify karein
+    emitToProject(task.projectId, "task:created", task);
+
+    return task;
   }
 
   static async getTasks(query: any, user: CurrentUser) {
@@ -194,7 +200,7 @@ export class TaskService {
       await this.validateAssignee(task.projectId, data.assigneeId);
     }
 
-    return prisma.task.update({
+    const updatedTask = await prisma.task.update({
       where: { id },
       data: {
         ...(data.title !== undefined && { title: data.title }),
@@ -213,6 +219,11 @@ export class TaskService {
         assignee: { select: { id: true, name: true, email: true } },
       },
     });
+
+    // Real-Time Event: Drag-and-drop ya task update live sync karein
+    emitToProject(task.projectId, "task:updated", updatedTask);
+
+    return updatedTask;
   }
 
   static async deleteTask(id: string, user: CurrentUser) {
@@ -224,6 +235,12 @@ export class TaskService {
     await prisma.task.update({
       where: { id },
       data: { isDeleted: true },
+    });
+
+    // Real-Time Event: Task delete hone par board se hatayein
+    emitToProject(task.projectId, "task:deleted", {
+      id,
+      projectId: task.projectId,
     });
 
     return { id, message: "Task successfully deleted" };
