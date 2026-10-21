@@ -103,6 +103,7 @@ model Task {
   description String?
   status      TaskStatus @default(TODO)
   priority    Priority   @default(MEDIUM)
+  order       Float      @default(0) // Kanban board card ordering
   dueDate     DateTime?
   isDeleted   Boolean    @default(false)
   createdAt   DateTime   @default(now())
@@ -125,6 +126,7 @@ model Task {
   @@index([creatorId])
   @@index([assigneeId])
   @@index([status])
+  @@index([order])
   @@index([isDeleted])
   @@map("tasks")
 }
@@ -154,11 +156,9 @@ model Notification {
   isRead    Boolean          @default(false)
   createdAt DateTime         @default(now())
 
-  // Kis user ko notification mila
   userId    String
   user      User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
 
-  // Optional Context IDs (Frontend direct redirect ke liye)
   projectId String?
   taskId    String?
 

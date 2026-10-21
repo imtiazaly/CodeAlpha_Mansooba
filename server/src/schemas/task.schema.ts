@@ -9,6 +9,7 @@ export const createTaskSchema = z.object({
     description: z.string().max(1000).optional(),
     status: taskStatusEnum.optional().default("TODO"),
     priority: priorityEnum.optional().default("MEDIUM"),
+    order: z.number().optional(), // Kanban position
     dueDate: z
       .string()
       .datetime({ message: "Invalid ISO datetime string" })
@@ -28,6 +29,7 @@ export const updateTaskSchema = z.object({
       description: z.string().max(1000).optional().nullable(),
       status: taskStatusEnum.optional(),
       priority: priorityEnum.optional(),
+      order: z.number().optional(), // Kanban drag-and-drop reorder
       dueDate: z.string().datetime().optional().nullable(),
       assigneeId: z.string().uuid("Invalid assignee ID").optional().nullable(),
     })
@@ -59,9 +61,9 @@ export const queryTasksSchema = z.object({
     priority: priorityEnum.optional(),
     search: z.string().optional(),
     sortBy: z
-      .enum(["createdAt", "dueDate", "title", "priority"])
+      .enum(["createdAt", "dueDate", "title", "priority", "order"]) // "order" added
       .optional()
-      .default("createdAt"),
-    sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+      .default("order"), // Default sort by Kanban order
+    sortOrder: z.enum(["asc", "desc"]).optional().default("asc"),
   }),
 });

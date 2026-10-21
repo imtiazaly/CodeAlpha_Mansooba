@@ -18,6 +18,7 @@ interface CreateTaskInput {
   description?: string;
   status?: TaskStatus;
   priority?: Priority;
+  order?: number; // Added
   dueDate?: string;
   projectId: string;
   assigneeId?: string | null;
@@ -28,6 +29,7 @@ interface UpdateTaskInput {
   description?: string | null;
   status?: TaskStatus;
   priority?: Priority;
+  order?: number; // Added
   dueDate?: string | null;
   assigneeId?: string | null;
 }
@@ -72,14 +74,32 @@ export class TaskService {
   static async createTask(data: CreateTaskInput, user: CurrentUser) {
     // Check project access & role
     await assertProjectAccess(data.projectId, user, ProjectRole.MEMBER);
+
     // Validate assignee (agar diya gaya hai)
     await this.validateAssignee(data.projectId, data.assigneeId);
+
+    // Agar order specify nahi kiya gaya to us column ka highest order + 1000 calculate karein
+    let taskOrder = data.order;
+    if (taskOrder === undefined) {
+      const highestTask = await prisma.task.findFirst({
+        where: {
+          projectId: data.projectId,
+          status: data.status || TaskStatus.TODO,
+          isDeleted: false,
+        },
+        orderBy: { order: "desc" },
+        select: { order: true },
+      });
+      taskOrder = highestTask ? highestTask.order + 1000 : 1000;
+    }
+
     const task = await prisma.task.create({
       data: {
         title: data.title,
         description: data.description,
         status: data.status,
         priority: data.priority,
+        order: taskOrder,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         projectId: data.projectId,
         creatorId: user.id,
@@ -223,6 +243,7 @@ export class TaskService {
         }),
         ...(data.status !== undefined && { status: data.status }),
         ...(data.priority !== undefined && { priority: data.priority }),
+        ...(data.order !== undefined && { order: data.order }), // Added for Kanban Drag & Drop
         ...(data.dueDate !== undefined && {
           dueDate: data.dueDate ? new Date(data.dueDate) : null,
         }),
