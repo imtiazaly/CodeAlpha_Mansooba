@@ -8,6 +8,8 @@ import { ApiError } from "./utils/ApiError.js";
 
 const app: Application = express();
 
+app.set("trust proxy", 1);
+
 // Security Middlewares
 app.use(helmet());
 app.use(cors({ origin: "*", credentials: true }));
