@@ -8,7 +8,8 @@
     "build": "rimraf dist && tsc",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "db:seed": "tsx src/seed.ts"
   },
   "repository": {
     "type": "git",
