@@ -9,7 +9,6 @@ interface RegisterInput {
   email: string;
   password: string;
   name: string;
-  role?: Role;
 }
 
 interface LoginInput {
@@ -34,7 +33,7 @@ export class AuthService {
         email: input.email,
         password: hashedPassword,
         name: input.name,
-        role: input.role || Role.USER,
+        role: Role.USER, // Har naya user hamesha USER banega
       },
       select: {
         id: true,
