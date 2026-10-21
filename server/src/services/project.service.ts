@@ -139,19 +139,35 @@ export class ProjectService {
     role: ProjectRole,
     user: CurrentUser,
   ) {
+    // Project owner role cannot be assigned via addMember
+    if (role === ProjectRole.OWNER) {
+      throw new ApiError(400, "Project owner role cannot be assigned to members");
+    }
+
     const project = await this.getProjectById(projectId, user);
 
     const member = project.members.find((m) => m.userId === user.id);
-    const canManage =
-      user.role === Role.ADMIN ||
-      member?.role === ProjectRole.OWNER ||
-      member?.role === ProjectRole.ADMIN;
+    const isSystemAdmin = user.role === Role.ADMIN;
+    const isProjectOwner =
+      member?.role === ProjectRole.OWNER || project.ownerId === user.id;
+    const isProjectAdmin = member?.role === ProjectRole.ADMIN;
 
-    if (!canManage)
+    const canManage = isSystemAdmin || isProjectOwner || isProjectAdmin;
+
+    if (!canManage) {
       throw new ApiError(
         403,
         "Forbidden: Insufficient permissions to add members",
       );
+    }
+
+    // Role Escalation Check: Sirf Project Owner ya System Admin hi kisi ko ADMIN bana sakta hai
+    if (role === ProjectRole.ADMIN && !isSystemAdmin && !isProjectOwner) {
+      throw new ApiError(
+        403,
+        "Forbidden: Only the project owner can grant ADMIN privileges",
+      );
+    }
 
     const targetUser = await prisma.user.findUnique({
       where: { id: targetUserId },
@@ -162,8 +178,9 @@ export class ProjectService {
       where: { projectId_userId: { projectId, userId: targetUserId } },
     });
 
-    if (existingMember)
+    if (existingMember) {
       throw new ApiError(409, "User is already a member of this project");
+    }
 
     return prisma.projectMember.create({
       data: { projectId, userId: targetUserId, role },
