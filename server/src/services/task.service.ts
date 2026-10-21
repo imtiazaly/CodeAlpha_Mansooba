@@ -4,6 +4,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { assertProjectAccess } from "../utils/projectAccess.js";
 import { ProjectRole } from "@prisma/client";
 import { emitToProject } from "../config/socket.js";
+import { NotificationService } from "./notification.service.js";
+import { NotificationType } from "@prisma/client";
 
 interface CurrentUser {
   id: string;
@@ -92,6 +94,18 @@ export class TaskService {
 
     // Real-Time Event: Project members ko naye task ka notify karein
     emitToProject(task.projectId, "task:created", task);
+
+    // Notification: Agar task kisi doosre user ko assign kiya gaya hai
+    if (task.assigneeId && task.assigneeId !== user.id) {
+      await NotificationService.createNotification({
+        userId: task.assigneeId,
+        type: NotificationType.TASK_ASSIGNED,
+        title: "New Task Assigned",
+        message: `You have been assigned to task: "${task.title}"`,
+        projectId: task.projectId,
+        taskId: task.id,
+      });
+    }
 
     return task;
   }
@@ -222,6 +236,42 @@ export class TaskService {
 
     // Real-Time Event: Drag-and-drop ya task update live sync karein
     emitToProject(task.projectId, "task:updated", updatedTask);
+
+    // Notification 1: Agar task kisi naye user ko assign hua hai
+    if (
+      updatedTask.assigneeId &&
+      updatedTask.assigneeId !== task.assigneeId &&
+      updatedTask.assigneeId !== user.id
+    ) {
+      await NotificationService.createNotification({
+        userId: updatedTask.assigneeId,
+        type: NotificationType.TASK_ASSIGNED,
+        title: "Task Assigned to You",
+        message: `You were assigned to task: "${updatedTask.title}"`,
+        projectId: task.projectId,
+        taskId: task.id,
+      });
+    }
+
+    // Notification 2: Agar task ka status change hua hai to creator & assignee ko notify karein
+    if (data.status && data.status !== task.status) {
+      const recipients = new Set<string>();
+      if (task.creatorId && task.creatorId !== user.id)
+        recipients.add(task.creatorId);
+      if (task.assigneeId && task.assigneeId !== user.id)
+        recipients.add(task.assigneeId);
+
+      for (const recipientId of recipients) {
+        await NotificationService.createNotification({
+          userId: recipientId,
+          type: NotificationType.TASK_STATUS_CHANGED,
+          title: "Task Status Updated",
+          message: `Task "${updatedTask.title}" status changed to ${updatedTask.status}`,
+          projectId: task.projectId,
+          taskId: task.id,
+        });
+      }
+    }
 
     return updatedTask;
   }

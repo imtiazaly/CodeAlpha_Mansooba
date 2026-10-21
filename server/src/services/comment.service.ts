@@ -4,6 +4,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { assertProjectAccess } from "../utils/projectAccess.js";
 import { ProjectRole } from "@prisma/client";
 import { emitToProject } from "../config/socket.js";
+import { NotificationService } from "./notification.service.js";
+import { NotificationType } from "@prisma/client";
 
 interface CurrentUser {
   id: string;
@@ -21,9 +23,15 @@ export class CommentService {
       where: {
         id: taskId,
         isDeleted: false,
-        project: { isDeleted: false }, // Deleted project block
+        project: { isDeleted: false },
       },
-      select: { id: true, projectId: true },
+      select: {
+        id: true,
+        title: true,
+        projectId: true,
+        creatorId: true,
+        assigneeId: true,
+      },
     });
 
     if (!task) throw new ApiError(404, "Task not found");
@@ -43,6 +51,24 @@ export class CommentService {
 
     // Real-Time Event: Task card mein live comment append karein
     emitToProject(task.projectId, "comment:created", { ...comment, taskId });
+
+    // Notification: Task creator aur assignee ko notify karein (agar comment unhon ne khud nahi kiya)
+    const recipients = new Set<string>();
+    if (task.creatorId && task.creatorId !== user.id)
+      recipients.add(task.creatorId);
+    if (task.assigneeId && task.assigneeId !== user.id)
+      recipients.add(task.assigneeId);
+
+    for (const recipientId of recipients) {
+      await NotificationService.createNotification({
+        userId: recipientId,
+        type: NotificationType.COMMENT_ADDED,
+        title: "New Comment on Task",
+        message: `${user.email} commented on "${task.title}"`,
+        projectId: task.projectId,
+        taskId: task.id,
+      });
+    }
 
     return comment;
   }

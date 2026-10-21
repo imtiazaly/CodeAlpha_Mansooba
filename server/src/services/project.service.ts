@@ -2,6 +2,8 @@ import { ProjectRole, Role } from "@prisma/client";
 import { prisma } from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import { emitToProject } from "../config/socket.js";
+import { NotificationService } from "./notification.service.js";
+import { NotificationType } from "@prisma/client";
 
 interface CurrentUser {
   id: string;
@@ -193,6 +195,17 @@ export class ProjectService {
 
     // Real-Time Event: Project members list update karein
     emitToProject(projectId, "member:added", newMember);
+
+    // Notification: Added member ko notify karein
+    if (targetUserId !== user.id) {
+      await NotificationService.createNotification({
+        userId: targetUserId,
+        type: NotificationType.PROJECT_INVITATION,
+        title: "Added to Project",
+        message: `You were added to project "${project.name}" as ${role}`,
+        projectId: project.id,
+      });
+    }
 
     return newMember;
   }
