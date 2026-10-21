@@ -17,13 +17,16 @@ export class CommentService {
     user: CurrentUser,
   ) {
     const task = await prisma.task.findFirst({
-      where: { id: taskId, isDeleted: false },
+      where: {
+        id: taskId,
+        isDeleted: false,
+        project: { isDeleted: false }, // Deleted project block
+      },
       select: { id: true, projectId: true },
     });
 
     if (!task) throw new ApiError(404, "Task not found");
 
-    // Comment karne ke liye kam az kam MEMBER hona zaroori hai (VIEWER comment nahi kar sakega)
     await assertProjectAccess(task.projectId, user, ProjectRole.MEMBER);
 
     return prisma.comment.create({
@@ -40,13 +43,16 @@ export class CommentService {
 
   static async getCommentsByTaskId(taskId: string, user: CurrentUser) {
     const task = await prisma.task.findFirst({
-      where: { id: taskId, isDeleted: false },
+      where: {
+        id: taskId,
+        isDeleted: false,
+        project: { isDeleted: false }, // Deleted project block
+      },
       select: { id: true, projectId: true },
     });
 
     if (!task) throw new ApiError(404, "Task not found");
 
-    // VIEWER comments read kar sakta hai
     await assertProjectAccess(task.projectId, user, ProjectRole.VIEWER);
 
     return prisma.comment.findMany({
@@ -65,17 +71,23 @@ export class CommentService {
   ) {
     const comment = await prisma.comment.findFirst({
       where: { id: commentId, taskId },
-      include: { task: { select: { projectId: true, isDeleted: true } } },
+      include: {
+        task: {
+          select: {
+            projectId: true,
+            isDeleted: true,
+            project: { select: { isDeleted: true } },
+          },
+        },
+      },
     });
 
-    if (!comment || comment.task.isDeleted) {
+    if (!comment || comment.task.isDeleted || comment.task.project.isDeleted) {
       throw new ApiError(404, "Comment not found");
     }
 
-    // Project access verify karein
     await assertProjectAccess(comment.task.projectId, user, ProjectRole.MEMBER);
 
-    // Sirf apna comment delete kar sakte hain (unless system ADMIN)
     if (user.role !== Role.ADMIN && comment.userId !== user.id) {
       throw new ApiError(
         403,

@@ -105,10 +105,13 @@ export class TaskService {
 
     const where: Prisma.TaskWhereInput = {
       isDeleted: false,
+      project: {
+        isDeleted: false,
+        ...(user.role !== Role.ADMIN && {
+          members: { some: { userId: user.id } },
+        }),
+      },
       ...(projectId && { projectId }),
-      ...(user.role !== Role.ADMIN && {
-        project: { members: { some: { userId: user.id } } },
-      }),
       ...(status && { status }),
       ...(priority && { priority }),
       ...(search && {
@@ -152,7 +155,11 @@ export class TaskService {
 
   static async getTaskById(id: string, user: CurrentUser) {
     const task = await prisma.task.findFirst({
-      where: { id, isDeleted: false },
+      where: {
+        id,
+        isDeleted: false,
+        project: { isDeleted: false },
+      },
       include: {
         creator: { select: { id: true, name: true, email: true } },
         assignee: { select: { id: true, name: true, email: true } },
