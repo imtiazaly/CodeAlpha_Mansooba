@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { X, FolderPlus, Loader2 } from "lucide-react";
@@ -22,6 +22,20 @@ export const CreateProjectModal = ({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Escape key listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +54,6 @@ export const CreateProjectModal = ({
 
       const newProject = res.data.data;
       toast.success("Project created successfully!");
-      // Invalidate projects cache taake dashboard auto-update ho
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       onClose();
       navigate(`/projects/${newProject.id}`);
@@ -52,12 +65,24 @@ export const CreateProjectModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-in fade-in duration-200">
+    <div
+      onClick={(e) => {
+        // Sirf outer backdrop click par close ho, modal card ke click par nahi
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
       <div className="w-full max-w-md bg-[#121214] border border-[#27272a] rounded-xl shadow-2xl p-6 relative">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-800 transition-colors"
+          aria-label="Close dialog"
+          className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -68,7 +93,10 @@ export const CreateProjectModal = ({
             <FolderPlus className="w-5 h-5 text-indigo-400" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-zinc-100">
+            <h3
+              id="modal-title"
+              className="text-base font-semibold text-zinc-100"
+            >
               Create New Project
             </h3>
             <p className="text-xs text-zinc-400">
