@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Layers, ArrowRight, Loader2 } from "lucide-react";
 import { apiClient } from "../../api/axios";
@@ -15,6 +15,9 @@ export const Login = () => {
 
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from =
+    (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +37,7 @@ export const Login = () => {
       connectSocket(token);
 
       toast.success("Welcome back to Mansooba!");
-      navigate("/");
+      navigate(from, { replace: true });
     } catch (err: any) {
       const msg = err.response?.data?.message || "Invalid email or password";
       toast.error(msg);
