@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Layers, ArrowRight, Loader2 } from "lucide-react";
@@ -41,9 +42,13 @@ export const Register = () => {
 
       toast.success("Account created successfully!");
       navigate("/");
-    } catch (err: any) {
-      const msg = err.response?.data?.message || "Registration failed";
-      toast.error(msg);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const msg = err.response?.data?.message || "Registration failed";
+        toast.error(msg);
+      } else {
+        toast.error("An unexpected error occurred. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

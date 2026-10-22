@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Layers, ArrowRight, Loader2 } from "lucide-react";
@@ -38,9 +39,13 @@ export const Login = () => {
 
       toast.success("Welcome back to Mansooba!");
       navigate(from, { replace: true });
-    } catch (err: any) {
-      const msg = err.response?.data?.message || "Invalid email or password";
-      toast.error(msg);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const msg = err.response?.data?.message || "Invalid email or password";
+        toast.error(msg);
+      } else {
+        toast.error("An unexpected error occurred. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

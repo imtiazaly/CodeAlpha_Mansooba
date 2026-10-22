@@ -3,15 +3,21 @@ import { io, Socket } from "socket.io-client";
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
 let socket: Socket | null = null;
+let activeToken: string | null = null;
 
-// Initialize or get existing socket connection
 export const getSocket = (): Socket | null => socket;
 
 export const connectSocket = (token: string): Socket => {
-  if (socket && socket.connected) {
+  // Agar same token ke sath already connected hai to naya mat banao
+  if (socket && socket.connected && activeToken === token) {
     return socket;
   }
 
+  if (socket) {
+    socket.disconnect();
+  }
+
+  activeToken = token;
   socket = io(SOCKET_URL, {
     auth: {
       token,
@@ -39,10 +45,10 @@ export const disconnectSocket = () => {
   if (socket) {
     socket.disconnect();
     socket = null;
+    activeToken = null;
   }
 };
 
-// Project Rooms Helper
 export const joinProjectRoom = (projectId: string) => {
   if (socket && socket.connected) {
     socket.emit("join:project", projectId);
