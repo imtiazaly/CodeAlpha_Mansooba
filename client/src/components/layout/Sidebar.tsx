@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Layers,
   LayoutDashboard,
@@ -16,7 +16,6 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
-  const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
@@ -33,7 +32,7 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
       label: "Dashboard",
       icon: LayoutDashboard,
       path: "/",
-      active: location.pathname === "/",
+      end: true,
     },
   ];
 
@@ -64,18 +63,21 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
+                <NavLink
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    item.active
-                      ? "bg-zinc-800/80 text-zinc-100 border border-zinc-700/60"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-                  }`}
+                  end={item.end}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      isActive
+                        ? "bg-zinc-800/80 text-zinc-100 border border-zinc-700/60"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent"
+                    }`
+                  }
                 >
                   <Icon className="w-4 h-4" />
                   {item.label}
-                </Link>
+                </NavLink>
               );
             })}
           </nav>
