@@ -1,4 +1,7 @@
 import axios from "axios";
+import { store } from "../store";
+import { logout } from "../store/slices/authSlice";
+import { disconnectSocket } from "../lib/socket";
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1",
@@ -8,7 +11,7 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
-// Request Interceptor: Attach JWT Token automatically
+// Request Interceptor: Attach JWT Token
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
@@ -20,19 +23,14 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Response Interceptor: Handle 401 Unauthorized
+// Response Interceptor: Seamless SPA Logout on 401
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      // Agar user login ya register par nahi hai to redirect karein
-      if (
-        !window.location.pathname.includes("/login") &&
-        !window.location.pathname.includes("/register")
-      ) {
-        window.location.href = "/login";
-      }
+      // Direct Redux action trigger without hard page refresh
+      store.dispatch(logout());
+      disconnectSocket();
     }
     return Promise.reject(error);
   },
