@@ -11,6 +11,7 @@ import { ProjectMembersModal } from "../../components/projects/ProjectMembersMod
 import { apiClient } from "../../api/axios";
 import { joinProjectRoom, leaveProjectRoom } from "../../lib/socket";
 import type { ApiResponse, Project, Task, TaskStatus } from "../../types";
+import { TaskDetailDrawer } from "../../components/kanban/TaskDetailDrawer";
 
 const COLUMNS: { status: TaskStatus; title: string; colorDot: string }[] = [
   { status: "TODO", title: "To Do", colorDot: "bg-zinc-500" },
@@ -188,6 +189,15 @@ export const ProjectDetail = () => {
           isOpen={isMembersModalOpen}
           onClose={() => setIsMembersModalOpen(false)}
           project={project}
+        />
+      )}
+
+      {/* Task Details & Comments Drawer */}
+      {selectedTask && (
+        <TaskDetailDrawer
+          task={tasks.find((t) => t.id === selectedTask.id) || selectedTask}
+          project={project}
+          onClose={() => setSelectedTask(null)}
         />
       )}
     </div>
