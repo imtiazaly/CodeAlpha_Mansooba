@@ -9,7 +9,7 @@ import { Header } from "../../components/layout/Header";
 import { KanbanColumn } from "../../components/kanban/KanbanColumn";
 import { ProjectMembersModal } from "../../components/projects/ProjectMembersModal";
 import { apiClient } from "../../api/axios";
-import { joinProjectRoom, leaveProjectRoom } from "../../lib/socket";
+import { getSocket, joinProjectRoom, leaveProjectRoom } from "../../lib/socket";
 import type { ApiResponse, Project, Task, TaskStatus } from "../../types";
 import { TaskDetailDrawer } from "../../components/kanban/TaskDetailDrawer";
 
@@ -29,11 +29,60 @@ export const ProjectDetail = () => {
 
   // Socket: Join project room for live updates
   useEffect(() => {
-    if (id) {
-      joinProjectRoom(id);
-      return () => leaveProjectRoom(id);
+    if (!id) return;
+
+    joinProjectRoom(id);
+    const socket = getSocket();
+
+    if (socket) {
+      // Live Task Events
+      const handleTaskCreated = () => {
+        queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+      };
+      const handleTaskUpdated = () => {
+        queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+      };
+      const handleTaskDeleted = () => {
+        queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+      };
+
+      // Live Comments Events
+      const handleCommentCreated = (data: { taskId: string }) => {
+        queryClient.invalidateQueries({ queryKey: ["comments", data.taskId] });
+        queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+      };
+      const handleCommentDeleted = (data: { taskId: string }) => {
+        queryClient.invalidateQueries({ queryKey: ["comments", data.taskId] });
+        queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+      };
+
+      // Live Members Events
+      const handleMemberChange = () => {
+        queryClient.invalidateQueries({ queryKey: ["project", id] });
+      };
+
+      socket.on("task:created", handleTaskCreated);
+      socket.on("task:updated", handleTaskUpdated);
+      socket.on("task:deleted", handleTaskDeleted);
+      socket.on("comment:created", handleCommentCreated);
+      socket.on("comment:deleted", handleCommentDeleted);
+      socket.on("member:added", handleMemberChange);
+      socket.on("member:removed", handleMemberChange);
+
+      return () => {
+        leaveProjectRoom(id);
+        socket.off("task:created", handleTaskCreated);
+        socket.off("task:updated", handleTaskUpdated);
+        socket.off("task:deleted", handleTaskDeleted);
+        socket.off("comment:created", handleCommentCreated);
+        socket.off("comment:deleted", handleCommentDeleted);
+        socket.off("member:added", handleMemberChange);
+        socket.off("member:removed", handleMemberChange);
+      };
     }
-  }, [id]);
+
+    return () => leaveProjectRoom(id);
+  }, [id, queryClient]);
 
   // 1. Fetch Project Details
   const {
