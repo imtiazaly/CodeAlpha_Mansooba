@@ -25,9 +25,11 @@ export const Header = ({
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => {
-      const res =
-        await apiClient.get<ApiResponse<Notification[]>>("/notifications");
-      return res.data.data;
+      const res = await apiClient.get<any>("/notifications");
+      return (
+        res.data.data?.notifications ||
+        (Array.isArray(res.data.data) ? res.data.data : [])
+      );
     },
   });
 
@@ -52,7 +54,9 @@ export const Header = ({
     }
   }, [queryClient]);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = notifications.filter(
+    (n: Notification) => !n.isRead,
+  ).length;
 
   return (
     <header className="h-14 bg-[#0c0c0e] border-b border-[#27272a] px-6 flex items-center justify-between shrink-0 relative">

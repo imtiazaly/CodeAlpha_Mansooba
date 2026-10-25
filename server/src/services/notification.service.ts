@@ -34,14 +34,15 @@ export class NotificationService {
 
   static async getUserNotifications(
     userId: string,
-    query: { page: number; limit: number; isRead?: boolean },
+    query: { page?: number; limit?: number; isRead?: boolean } = {},
   ) {
-    const { page, limit, isRead } = query;
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.max(1, Math.min(50, Number(query?.limit) || 20));
     const skip = (page - 1) * limit;
 
     const where = {
       userId,
-      ...(isRead !== undefined && { isRead }),
+      ...(query?.isRead !== undefined && { isRead: query.isRead }),
     };
 
     const [total, unreadCount, notifications] = await Promise.all([

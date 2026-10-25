@@ -103,7 +103,7 @@ export const ProjectDetail = () => {
     queryKey: ["tasks", id],
     queryFn: async () => {
       const res = await apiClient.get<ApiResponse<Task[]>>(
-        `/tasks?projectId=${id}`,
+        `/tasks?projectId=${id}&limit=500`,
       );
       return res.data.data;
     },
