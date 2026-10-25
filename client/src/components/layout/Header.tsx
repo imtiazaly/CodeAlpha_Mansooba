@@ -1,12 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Bell,
-  Search,
-  Command,
-  Menu,
-  PanelLeft,
-} from "lucide-react";
+import { Bell, Search, Command, Menu, PanelLeft } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../api/axios";
 import { getSocket } from "../../lib/socket";
@@ -49,7 +43,7 @@ export const Header = ({
     },
   });
 
-  // 2. Real-Time Socket Listener for Instant Notifications
+  // 2. Real-Time Socket Listener for Instant Live Updates (Zero Page Reload)
   useEffect(() => {
     const socket = getSocket();
     if (socket) {
@@ -58,8 +52,14 @@ export const Header = ({
         toast.info(notification.title, {
           description: notification.message,
         });
-        // Invalidate notifications cache to update badge
+
+        // Instant Cache Invalidation:
+        // Automatically updates Bell badge, Pending Invitations Banner,
+        // Workspace Switcher, and Team Members list in real-time!
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["pending-invitations"] });
+        queryClient.invalidateQueries({ queryKey: ["organization-members"] });
+        queryClient.invalidateQueries({ queryKey: ["my-organizations"] });
       };
 
       socket.on("notification:new", handleNewNotification);
@@ -90,7 +90,6 @@ export const Header = ({
     <header className="h-14 bg-[#0c0c0e] border-b border-[#27272a] px-3 sm:px-6 flex items-center justify-between shrink-0 relative">
       {/* Left side: Sidebar Toggles (Mobile & Desktop) + Title */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-        {/* Mobile Hamburger Button */}
         <button
           onClick={() => dispatch(toggleMobileSidebar())}
           className="md:hidden p-1.5 -ml-1 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer shrink-0"
@@ -99,7 +98,6 @@ export const Header = ({
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Desktop Sidebar Expand Button (visible only when desktop sidebar is collapsed) */}
         {isDesktopSidebarCollapsed && (
           <button
             onClick={() => dispatch(toggleDesktopSidebar())}
@@ -124,7 +122,6 @@ export const Header = ({
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Actions slot */}
         {actions}
 
         {/* Search Button */}

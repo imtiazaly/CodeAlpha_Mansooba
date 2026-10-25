@@ -1,6 +1,7 @@
-import { MembershipStatus, Role } from "@prisma/client";
+import { MembershipStatus, NotificationType, Role } from "@prisma/client";
 import { prisma } from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
+import { NotificationService } from "./notification.service.js";
 
 export class OrganizationService {
   // 1. User ki active (ACCEPTED) organizations fetch karo
@@ -65,7 +66,7 @@ export class OrganizationService {
     }));
   }
 
-  // 3. Invitation Accept ya Decline karo
+  // 3. Invitation Accept ya Decline karo (With Live Notification to Admins)
   static async respondToInvitation(
     userId: string,
     membershipId: string,
@@ -86,11 +87,40 @@ export class OrganizationService {
       throw new ApiError(404, "Pending invitation not found");
     }
 
+    // Responding user ki details
+    const respondingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+    const userName =
+      respondingUser?.name || respondingUser?.email || "A member";
+
+    // Workspace ke active Admins nikalo jinhe notify karna hai
+    const orgAdmins = await prisma.userOrganizationMembership.findMany({
+      where: {
+        organizationId: membership.organizationId,
+        role: Role.ADMIN,
+        status: MembershipStatus.ACCEPTED,
+        userId: { not: userId },
+      },
+      select: { userId: true },
+    });
+
     if (action === "ACCEPT") {
       await prisma.userOrganizationMembership.update({
         where: { id: membershipId },
         data: { status: MembershipStatus.ACCEPTED },
       });
+
+      // Tamam workspace Admins ko instant live notification deliver karo
+      for (const admin of orgAdmins) {
+        await NotificationService.createNotification({
+          userId: admin.userId,
+          type: NotificationType.WORKSPACE_INVITATION,
+          title: "Invitation Accepted",
+          message: `${userName} accepted your invitation and joined "${membership.organization.name}".`,
+        });
+      }
 
       return {
         action: "ACCEPTED",
@@ -102,6 +132,16 @@ export class OrganizationService {
         where: { id: membershipId },
       });
 
+      // Tamam workspace Admins ko instant decline notification bhejo
+      for (const admin of orgAdmins) {
+        await NotificationService.createNotification({
+          userId: admin.userId,
+          type: NotificationType.WORKSPACE_INVITATION,
+          title: "Invitation Declined",
+          message: `${userName} declined the invitation to join "${membership.organization.name}".`,
+        });
+      }
+
       return {
         action: "DECLINED",
         message: `Declined invitation to ${membership.organization.name}`,
@@ -110,7 +150,7 @@ export class OrganizationService {
     }
   }
 
-  // 4. Active organization switch karo (User ka session role bhi is org ke role se match hoga)
+  // 4. Active organization switch karo
   static async switchOrganization(userId: string, organizationId: string) {
     const membership = await prisma.userOrganizationMembership.findUnique({
       where: {
