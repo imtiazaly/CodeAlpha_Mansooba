@@ -13,10 +13,43 @@ export class UserController {
           new ApiResponse(
             200,
             members,
-            "Organization members retrieved successfully",
-          ),
+            "Organization members retrieved successfully"
+          )
         );
-    },
+    }
+  );
+
+  // PATCH /users/members/:userId/role — Update member role (Admin only)
+  static updateMemberRole = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!role || (role !== "ADMIN" && role !== "USER")) {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, null, "Role must be ADMIN or USER"));
+      }
+
+      const result = await UserService.updateMemberRole(
+        userId,
+        role,
+        req.user!
+      );
+      res.status(200).json(new ApiResponse(200, result, result.message));
+    }
+  );
+
+  // DELETE /users/members/:userId — Remove member from organization (Admin only)
+  static removeOrganizationMember = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { userId } = req.params;
+      const result = await UserService.removeOrganizationMember(
+        userId,
+        req.user!
+      );
+      res.status(200).json(new ApiResponse(200, result, result.message));
+    }
   );
 
   // PATCH /users/profile — Update name
@@ -46,7 +79,7 @@ export class UserController {
       res
         .status(200)
         .json(new ApiResponse(200, org, "Organization updated successfully"));
-    },
+    }
   );
 
   static inviteUser = asyncHandler(async (req: Request, res: Response) => {
@@ -56,7 +89,6 @@ export class UserController {
       .json(new ApiResponse(201, newUser, "User invited successfully"));
   });
 
-  // FIX: parseInt ensures Prisma receives an integer, not a string
   static searchUsers = asyncHandler(async (req: Request, res: Response) => {
     const query = (req.query.q as string) || "";
     const limit = Math.max(1, parseInt(String(req.query.limit || 10), 10));

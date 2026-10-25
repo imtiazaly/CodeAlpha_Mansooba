@@ -6,7 +6,11 @@ import bcrypt from "bcryptjs";
 
 export class UserService {
   // 1. Organization Members Directory (Sirf ACCEPTED members)
-  static async getOrganizationMembers(currentUser: { id: string; role: Role; organizationId?: string | null }) {
+  static async getOrganizationMembers(currentUser: {
+    id: string;
+    role: Role;
+    organizationId?: string | null;
+  }) {
     const orgId = currentUser.organizationId;
     if (!orgId) return [];
 
@@ -21,7 +25,11 @@ export class UserService {
           select: { projectId: true },
         }),
         prisma.project.findMany({
-          where: { ownerId: currentUser.id, isDeleted: false, organizationId: orgId },
+          where: {
+            ownerId: currentUser.id,
+            isDeleted: false,
+            organizationId: orgId,
+          },
           select: { id: true },
         }),
       ]);
@@ -49,12 +57,13 @@ export class UserService {
       ]);
     }
 
-    // Active members of this organization
     const orgMemberships = await prisma.userOrganizationMembership.findMany({
       where: {
         organizationId: orgId,
         status: MembershipStatus.ACCEPTED,
-        ...(allowedUserIds ? { userId: { in: Array.from(allowedUserIds) } } : {}),
+        ...(allowedUserIds
+          ? { userId: { in: Array.from(allowedUserIds) } }
+          : {}),
       },
       include: {
         user: {
@@ -66,8 +75,17 @@ export class UserService {
             createdAt: true,
             _count: {
               select: {
-                assignedTasks: { where: { isDeleted: false, project: { organizationId: orgId } } },
-                projectMembers: { where: { project: { organizationId: orgId, isDeleted: false } } },
+                assignedTasks: {
+                  where: {
+                    isDeleted: false,
+                    project: { organizationId: orgId },
+                  },
+                },
+                projectMembers: {
+                  where: {
+                    project: { organizationId: orgId, isDeleted: false },
+                  },
+                },
               },
             },
             projectMembers: {
@@ -106,7 +124,7 @@ export class UserService {
           id: u.id,
           name: u.name,
           email: u.email,
-          role: om.role, // Workspace role
+          role: om.role,
           createdAt: om.joinedAt.toISOString(),
           totalTasks: isAdmin ? u._count.assignedTasks : null,
           totalProjects: isAdmin ? u._count.projectMembers : null,
@@ -115,7 +133,146 @@ export class UserService {
       });
   }
 
-  // 2. Update Profile
+  // 2. Update Member Role within Organization (Admin only)
+  static async updateMemberRole(
+    targetUserId: string,
+    newRole: Role,
+    adminUser: { id: string; role: Role; organizationId?: string | null },
+  ) {
+    if (adminUser.role !== Role.ADMIN) {
+      throw new ApiError(403, "Only administrators can update member roles");
+    }
+
+    const orgId = adminUser.organizationId;
+    if (!orgId) {
+      throw new ApiError(400, "Admin does not have an active workspace");
+    }
+
+    if (targetUserId === adminUser.id) {
+      throw new ApiError(400, "You cannot modify your own administrator role");
+    }
+
+    const membership = await prisma.userOrganizationMembership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: targetUserId,
+          organizationId: orgId,
+        },
+      },
+    });
+
+    if (!membership || membership.status !== MembershipStatus.ACCEPTED) {
+      throw new ApiError(404, "Active member not found in this organization");
+    }
+
+    await prisma.userOrganizationMembership.update({
+      where: { id: membership.id },
+      data: { role: newRole },
+    });
+
+    // Agar user is waqt isi workspace mein logged in hai to session role bhi update karo
+    await prisma.user.updateMany({
+      where: { id: targetUserId, organizationId: orgId },
+      data: { role: newRole },
+    });
+
+    return { message: "Member role updated successfully", role: newRole };
+  }
+
+  // 3. Remove Member from Organization (Admin only — User account stays safe)
+  static async removeOrganizationMember(
+    targetUserId: string,
+    adminUser: { id: string; role: Role; organizationId?: string | null },
+  ) {
+    if (adminUser.role !== Role.ADMIN) {
+      throw new ApiError(
+        403,
+        "Only administrators can remove members from the workspace",
+      );
+    }
+
+    const orgId = adminUser.organizationId;
+    if (!orgId) {
+      throw new ApiError(400, "Admin does not have an active workspace");
+    }
+
+    if (targetUserId === adminUser.id) {
+      throw new ApiError(
+        400,
+        "You cannot remove yourself from your own organization",
+      );
+    }
+
+    const membership = await prisma.userOrganizationMembership.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: targetUserId,
+          organizationId: orgId,
+        },
+      },
+      include: {
+        organization: { select: { name: true } },
+      },
+    });
+
+    if (!membership) {
+      throw new ApiError(404, "Member not found in this organization");
+    }
+
+    // Safe Workspace Removal Transaction:
+    // 1. Delete organization membership
+    // 2. Remove member from projects belonging to this organization
+    // 3. If active workspace was this org, fallback to another workspace or null
+    await prisma.$transaction(async (tx) => {
+      await tx.userOrganizationMembership.delete({
+        where: { id: membership.id },
+      });
+
+      const orgProjects = await tx.project.findMany({
+        where: { organizationId: orgId },
+        select: { id: true },
+      });
+      const projectIds = orgProjects.map((p) => p.id);
+
+      if (projectIds.length > 0) {
+        await tx.projectMember.deleteMany({
+          where: {
+            userId: targetUserId,
+            projectId: { in: projectIds },
+          },
+        });
+      }
+
+      const otherMembership = await tx.userOrganizationMembership.findFirst({
+        where: {
+          userId: targetUserId,
+          status: MembershipStatus.ACCEPTED,
+        },
+      });
+
+      await tx.user.updateMany({
+        where: { id: targetUserId, organizationId: orgId },
+        data: {
+          organizationId: otherMembership
+            ? otherMembership.organizationId
+            : null,
+          role: otherMembership ? otherMembership.role : Role.USER,
+        },
+      });
+    });
+
+    // Notification bhejo
+    await NotificationService.createNotification({
+      userId: targetUserId,
+      type: NotificationType.PROJECT_REMOVED,
+      title: "Removed from Workspace",
+      message: `You were removed from "${membership.organization.name}" workspace by an administrator.`,
+    });
+
+    return { message: "Member removed from organization successfully" };
+  }
+
+  // 4. Update Profile
   static async updateProfile(userId: string, data: { name: string }) {
     if (!data.name || data.name.trim().length < 2) {
       throw new ApiError(400, "Name must be at least 2 characters");
@@ -138,7 +295,7 @@ export class UserService {
     });
   }
 
-  // 3. Change Password
+  // 5. Change Password
   static async changePassword(
     userId: string,
     data: { currentPassword: string; newPassword: string },
@@ -161,7 +318,10 @@ export class UserService {
 
     const isSame = await bcrypt.compare(data.newPassword, user.password);
     if (isSame) {
-      throw new ApiError(400, "New password cannot be same as current password");
+      throw new ApiError(
+        400,
+        "New password cannot be same as current password",
+      );
     }
 
     const hashedPassword = await bcrypt.hash(data.newPassword, 12);
@@ -174,18 +334,24 @@ export class UserService {
     return { message: "Password changed successfully" };
   }
 
-  // 4. Update Organization Name
+  // 6. Update Organization Name
   static async updateOrganization(
     userId: string,
     userRole: Role,
     data: { name: string },
   ) {
     if (userRole !== Role.ADMIN) {
-      throw new ApiError(403, "Only administrators can update organization details");
+      throw new ApiError(
+        403,
+        "Only administrators can update organization details",
+      );
     }
 
     if (!data.name || data.name.trim().length < 2) {
-      throw new ApiError(400, "Organization name must be at least 2 characters");
+      throw new ApiError(
+        400,
+        "Organization name must be at least 2 characters",
+      );
     }
 
     const user = await prisma.user.findUnique({
@@ -204,7 +370,7 @@ export class UserService {
     });
   }
 
-  // 5. Invite User — with Role Selection & Consent (PENDING Invitation)
+  // 7. Invite User
   static async inviteUser(
     data: { name: string; email: string; role?: Role; password?: string },
     adminUser: { id: string; role: Role },
@@ -228,7 +394,6 @@ export class UserService {
     const targetEmail = data.email.trim();
     const assignedRole = data.role === Role.ADMIN ? Role.ADMIN : Role.USER;
 
-    // ── CASE A: Existing User ──
     const existingUser = await prisma.user.findFirst({
       where: {
         email: { equals: targetEmail, mode: "insensitive" },
@@ -243,14 +408,15 @@ export class UserService {
     });
 
     if (existingUser) {
-      const existingMembership = await prisma.userOrganizationMembership.findUnique({
-        where: {
-          userId_organizationId: {
-            userId: existingUser.id,
-            organizationId: admin.organizationId,
+      const existingMembership =
+        await prisma.userOrganizationMembership.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: existingUser.id,
+              organizationId: admin.organizationId,
+            },
           },
-        },
-      });
+        });
 
       if (existingMembership) {
         if (existingMembership.status === MembershipStatus.ACCEPTED) {
@@ -265,7 +431,6 @@ export class UserService {
             `An invitation is already pending for ${existingUser.name}`,
           );
         }
-        // Agar pehle REJECT hua tha to dubara PENDING karo with new role
         await prisma.userOrganizationMembership.update({
           where: { id: existingMembership.id },
           data: {
@@ -275,7 +440,6 @@ export class UserService {
           },
         });
       } else {
-        // Nayi PENDING invitation create karo
         await prisma.userOrganizationMembership.create({
           data: {
             userId: existingUser.id,
@@ -286,12 +450,13 @@ export class UserService {
         });
       }
 
-      // User ko live notification deliver karo
       await NotificationService.createNotification({
         userId: existingUser.id,
         type: NotificationType.WORKSPACE_INVITATION,
         title: "Workspace Invitation",
-        message: `You were invited to join "${admin.organization?.name}" as ${assignedRole === Role.ADMIN ? "Admin" : "Member"}`,
+        message: `You were invited to join "${admin.organization?.name}" as ${
+          assignedRole === Role.ADMIN ? "Admin" : "Member"
+        }`,
       });
 
       return {
@@ -302,7 +467,6 @@ export class UserService {
       };
     }
 
-    // ── CASE B: Completely New User ──
     const defaultPassword = data.password || "Password123!";
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
@@ -338,7 +502,7 @@ export class UserService {
     });
   }
 
-  // 6. Search users
+  // 8. Search users
   static async searchUsers(
     query: string,
     currentUserId: string,
@@ -364,7 +528,7 @@ export class UserService {
     });
   }
 
-  // 7. Get user by ID
+  // 9. Get user by ID
   static async getUserById(id: string) {
     const user = await prisma.user.findFirst({
       where: { id, isActive: true },
