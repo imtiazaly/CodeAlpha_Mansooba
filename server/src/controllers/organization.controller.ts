@@ -16,6 +16,52 @@ export class OrganizationController {
     },
   );
 
+  // GET /organizations/invitations
+  static getPendingInvitations = asyncHandler(
+    async (req: Request, res: Response) => {
+      const invitations = await OrganizationService.getPendingInvitations(
+        req.user!.id,
+      );
+      res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            invitations,
+            "Pending invitations retrieved successfully",
+          ),
+        );
+    },
+  );
+
+  // POST /organizations/invitations/:id/respond
+  static respondToInvitation = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { id } = req.params;
+      const { action } = req.body;
+
+      if (!action || (action !== "ACCEPT" && action !== "DECLINE")) {
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(
+              400,
+              null,
+              "Action must be either ACCEPT or DECLINE",
+            ),
+          );
+      }
+
+      const result = await OrganizationService.respondToInvitation(
+        req.user!.id,
+        id,
+        action,
+      );
+
+      res.status(200).json(new ApiResponse(200, result, result.message));
+    },
+  );
+
   // PATCH /organizations/switch
   static switchOrganization = asyncHandler(
     async (req: Request, res: Response) => {
