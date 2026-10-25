@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { apiClient } from "../../api/axios";
 import { getSocket } from "../../lib/socket";
 import { NotificationsPopover } from "../notifications/NotificationsPopover";
-import type { ApiResponse, Notification } from "../../types";
+import type { Notification } from "../../types";
+import { SearchDialog } from "./SearchDialog";
 
 interface HeaderProps {
   title?: string;
@@ -19,6 +20,7 @@ export const Header = ({
   actions,
 }: HeaderProps) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // 1. Fetch User Notifications
@@ -54,6 +56,18 @@ export const Header = ({
     }
   }, [queryClient]);
 
+  // Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   const unreadCount = notifications.filter(
     (n: Notification) => !n.isRead,
   ).length;
@@ -79,14 +93,17 @@ export const Header = ({
         {/* Actions slot */}
         {actions}
 
-        {/* Search Mock */}
-        <div className="hidden sm:flex items-center gap-2 bg-[#18181b] border border-[#27272a] rounded-lg px-2.5 py-1 text-xs text-zinc-400">
+        {/* Search Button */}
+        <button
+          onClick={() => setIsSearchOpen(true)}
+          className="hidden sm:flex items-center gap-2 bg-[#18181b] border border-[#27272a] hover:border-zinc-600 rounded-lg px-2.5 py-1 text-xs text-zinc-400 transition-colors cursor-pointer"
+        >
           <Search className="w-3.5 h-3.5 text-zinc-500" />
           <span className="text-zinc-500">Search...</span>
           <kbd className="text-[10px] bg-zinc-800 text-zinc-400 px-1 rounded flex items-center gap-0.5">
             <Command className="w-2.5 h-2.5" /> K
           </kbd>
-        </div>
+        </button>
 
         {/* Notifications Bell */}
         <button
@@ -108,6 +125,11 @@ export const Header = ({
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
         notifications={notifications}
+      />
+
+      <SearchDialog
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
       />
     </header>
   );
