@@ -17,7 +17,6 @@ interface LoginInput {
   password: string;
 }
 
-// Helper: organization name se clean slug banao
 const generateSlug = (name: string): string => {
   return name
     .toLowerCase()
@@ -30,7 +29,6 @@ const generateSlug = (name: string): string => {
 
 export class AuthService {
   static async register(input: RegisterInput) {
-    // 1. Email already exists check
     const existingUser = await prisma.user.findUnique({
       where: { email: input.email },
     });
@@ -40,19 +38,16 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(input.password, 12);
 
-    // 2. Unique slug generate karo (collision handle)
     let slug = generateSlug(input.organizationName);
     const existingSlug = await prisma.organization.findUnique({
       where: { slug },
     });
     if (existingSlug) {
-      // Collision hone par random suffix lagao
       slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
     }
 
-    // 3. Transaction: Organization + User ek sath banao
     const result = await prisma.$transaction(async (tx) => {
-      // Organization create karo
+      // 1. Organization create karo
       const organization = await tx.organization.create({
         data: {
           name: input.organizationName.trim(),
@@ -60,13 +55,13 @@ export class AuthService {
         },
       });
 
-      // User create karo — ADMIN role (workspace owner)
+      // 2. User create karo (ADMIN role)
       const user = await tx.user.create({
         data: {
           email: input.email,
           password: hashedPassword,
           name: input.name,
-          role: Role.ADMIN, // Naye workspace ka creator hamesha ADMIN
+          role: Role.ADMIN,
           organizationId: organization.id,
         },
         select: {
@@ -79,6 +74,14 @@ export class AuthService {
           organization: {
             select: { id: true, name: true, slug: true },
           },
+        },
+      });
+
+      // 3. Membership record bhi create karo (switcher ke liye)
+      await tx.userOrganizationMembership.create({
+        data: {
+          userId: user.id,
+          organizationId: organization.id,
         },
       });
 

@@ -234,25 +234,39 @@ export class UserService {
     const defaultPassword = data.password || "Password123!";
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    return prisma.user.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        password: hashedPassword,
-        role: data.role || Role.USER,
-        organizationId: admin?.organizationId || null,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      },
+    // Transaction: User + Membership ek sath banao
+    return prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: data.name,
+          email: data.email,
+          password: hashedPassword,
+          role: data.role || Role.USER,
+          organizationId: admin?.organizationId || null,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      // Membership bhi create karo
+      if (admin?.organizationId) {
+        await tx.userOrganizationMembership.create({
+          data: {
+            userId: newUser.id,
+            organizationId: admin.organizationId,
+          },
+        });
+      }
+
+      return newUser;
     });
   }
-
   // 6. Search users
   static async searchUsers(
     query: string,

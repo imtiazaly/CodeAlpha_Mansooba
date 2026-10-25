@@ -1,14 +1,14 @@
 import { Router } from "express";
 import { authRoutes } from "./auth.routes.js";
-import { userRoutes } from "./user.routes.js"; // <-- Import
+import { userRoutes } from "./user.routes.js";
 import { projectRoutes } from "./project.routes.js";
 import { taskRoutes } from "./task.routes.js";
 import { notificationRoutes } from "./notification.routes.js";
+import { organizationRoutes } from "./organization.routes.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const router = Router();
 
-// Health check endpoint
 router.get("/health", (req, res) => {
   res.status(200).json(
     new ApiResponse(
@@ -23,11 +23,11 @@ router.get("/health", (req, res) => {
   );
 });
 
-// Mounted Versioned Resource Routes
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
 router.use("/projects", projectRoutes);
 router.use("/tasks", taskRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/organizations", organizationRoutes);
 
 export const apiRouter = router;
