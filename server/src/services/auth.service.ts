@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { Role } from "@prisma/client";
+import { Role, MembershipStatus } from "@prisma/client";
 import { prisma } from "../config/db.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -77,11 +77,19 @@ export class AuthService {
         },
       });
 
-      // 3. Membership record bhi create karo (switcher ke liye)
+      // 3. Organization ka ownerId set karo
+      await tx.organization.update({
+        where: { id: organization.id },
+        data: { ownerId: user.id },
+      });
+
+      // 4. Membership record create karo (Role explicitly ADMIN)
       await tx.userOrganizationMembership.create({
         data: {
           userId: user.id,
           organizationId: organization.id,
+          role: Role.ADMIN,
+          status: MembershipStatus.ACCEPTED,
         },
       });
 
