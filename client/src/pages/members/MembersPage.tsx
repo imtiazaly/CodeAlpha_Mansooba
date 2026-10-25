@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Mail,
   Calendar,
+  FolderKanban,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,8 +26,8 @@ interface MemberItem {
   email: string;
   role: Role;
   createdAt: string;
-  totalTasks: number;
-  totalProjects: number;
+  totalTasks: number | null;
+  totalProjects: number | null;
   projects: { id: string; name: string; role: string }[];
 }
 
@@ -38,14 +39,14 @@ export const MembersPage = () => {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "ALL">("ALL");
 
-  // Invite modal state (Only for Admin)
+  // Invite modal state (Admin only)
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("USER");
   const [isInviting, setIsInviting] = useState(false);
 
-  // Fetch Organization Members
+  // Fetch Members
   const { data: members = [], isLoading } = useQuery<MemberItem[]>({
     queryKey: ["organization-members"],
     queryFn: async () => {
@@ -67,7 +68,6 @@ export const MembersPage = () => {
   const adminCount = members.filter((m) => m.role === "ADMIN").length;
   const userCount = members.filter((m) => m.role === "USER").length;
 
-  // Invite Member Handler
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteName.trim() || !inviteEmail.trim()) {
@@ -100,8 +100,12 @@ export const MembersPage = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#09090b]">
       {/* Header */}
       <Header
-        title="Team Directory"
-        subtitle="Manage organization members, roles, and project allocations"
+        title={isAdmin ? "Team Directory" : "Project Teammates"}
+        subtitle={
+          isAdmin
+            ? "Manage organization members, roles, and project allocations"
+            : "Colleagues collaborating with you across shared projects"
+        }
         actions={
           isAdmin && (
             <button
@@ -124,29 +128,69 @@ export const MembersPage = () => {
             </div>
             <div>
               <p className="text-xl font-bold text-zinc-100">{totalMembers}</p>
-              <p className="text-[11px] text-zinc-500">Total Teammates</p>
+              <p className="text-[11px] text-zinc-500">
+                {isAdmin ? "Total Teammates" : "Your Co-workers"}
+              </p>
             </div>
           </div>
 
-          <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-              <Shield className="w-5 h-5 text-amber-400" />
-            </div>
-            <div>
-              <p className="text-xl font-bold text-zinc-100">{adminCount}</p>
-              <p className="text-[11px] text-zinc-500">Administrators</p>
-            </div>
-          </div>
+          {isAdmin ? (
+            <>
+              <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-zinc-100">
+                    {adminCount}
+                  </p>
+                  <p className="text-[11px] text-zinc-500">Administrators</p>
+                </div>
+              </div>
 
-          <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <Briefcase className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-xl font-bold text-zinc-100">{userCount}</p>
-              <p className="text-[11px] text-zinc-500">Standard Members</p>
-            </div>
-          </div>
+              <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Briefcase className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-zinc-100">{userCount}</p>
+                  <p className="text-[11px] text-zinc-500">Standard Members</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                  <FolderKanban className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-zinc-100">
+                    {
+                      new Set(
+                        members.flatMap((m) => m.projects.map((p) => p.id)),
+                      ).size
+                    }
+                  </p>
+                  <p className="text-[11px] text-zinc-500">Active Workspaces</p>
+                </div>
+              </div>
+
+              <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-zinc-100">
+                    Confidential
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    Role-Isolated Workspace
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Search & Filter Controls ── */}
@@ -186,7 +230,7 @@ export const MembersPage = () => {
           <div className="text-center py-16 bg-[#121214] border border-[#27272a] rounded-xl p-8">
             <Users className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
             <p className="text-sm text-zinc-400">
-              No members match your criteria
+              No teammates match your criteria
             </p>
           </div>
         ) : (
@@ -228,11 +272,13 @@ export const MembersPage = () => {
                   {/* Projects Section */}
                   <div className="mt-3 pt-3 border-t border-[#27272a]">
                     <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">
-                      Projects ({m.projects.length})
+                      {isAdmin
+                        ? `Projects (${m.projects.length})`
+                        : `Shared Projects (${m.projects.length})`}
                     </p>
                     {m.projects.length === 0 ? (
                       <p className="text-[11px] text-zinc-600 italic">
-                        No accessible projects
+                        No shared projects
                       </p>
                     ) : (
                       <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
@@ -249,12 +295,19 @@ export const MembersPage = () => {
                   </div>
                 </div>
 
-                {/* Footer: Task counts and Joined date */}
+                {/* Footer: Admin ko task count dikhega, regular user ko sirf joined date */}
                 <div className="flex items-center justify-between pt-3 mt-4 border-t border-[#27272a] text-[11px] text-zinc-500">
-                  <span className="flex items-center gap-1">
-                    <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>{m.totalTasks} tasks assigned</span>
-                  </span>
+                  {isAdmin && m.totalTasks !== null ? (
+                    <span className="flex items-center gap-1 text-zinc-400">
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      <span>{m.totalTasks} tasks assigned</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-zinc-500">
+                      Collaborator
+                    </span>
+                  )}
+
                   <span className="flex items-center gap-1 font-mono text-[10px]">
                     <Calendar className="w-3 h-3 text-zinc-500" />
                     <span>

@@ -4,9 +4,8 @@ import { ApiError } from "../utils/ApiError.js";
 import bcrypt from "bcryptjs";
 
 export class UserService {
-  // 1. Organization Members Directory (Strict Project Co-worker Boundary)
+  // 1. Organization Members Directory (Strict Privacy & Permission Scoping)
   static async getOrganizationMembers(currentUser: { id: string; role: Role }) {
-    // Current user ka organizationId check karein
     const me = await prisma.user.findUnique({
       where: { id: currentUser.id },
       select: { organizationId: true },
@@ -16,12 +15,12 @@ export class UserService {
       ? { organizationId: me.organizationId }
       : {};
 
-    // ── Regular USER logic: Sirf shared projects ke members dhoondein ──
+    const isAdmin = currentUser.role === Role.ADMIN;
     let allowedUserIds: Set<string> | null = null;
     let myProjectIds = new Set<string>();
 
-    if (currentUser.role !== Role.ADMIN) {
-      // 1. Current user kin kin projects mein Owner ya Member hai
+    if (!isAdmin) {
+      // 1. Current user kin projects mein shamil hai
       const [memberships, ownedProjects] = await Promise.all([
         prisma.projectMember.findMany({
           where: { userId: currentUser.id },
@@ -38,7 +37,7 @@ export class UserService {
         ...ownedProjects.map((p) => p.id),
       ]);
 
-      // 2. Un projects ke tamam members aur owners ke IDs nikalein
+      // 2. Un projects ke co-workers nikalein
       const [coMembers, projectOwners] = await Promise.all([
         prisma.projectMember.findMany({
           where: { projectId: { in: Array.from(myProjectIds) } },
@@ -50,7 +49,6 @@ export class UserService {
         }),
       ]);
 
-      // Co-workers list (including self)
       allowedUserIds = new Set<string>([
         currentUser.id,
         ...coMembers.map((cm) => cm.userId),
@@ -63,7 +61,7 @@ export class UserService {
       where: {
         isActive: true,
         ...whereOrg,
-        // Regular USER ko sirf allowed co-workers dikhein
+        // Regular USER ko sirf co-workers dikhein
         ...(allowedUserIds ? { id: { in: Array.from(allowedUserIds) } } : {}),
       },
       select: {
@@ -98,10 +96,7 @@ export class UserService {
       // Filter projects: Regular user ko sirf wahi projects dikhein jo shared hon
       const visibleProjects = u.projectMembers
         .filter((pm) => !pm.project.isDeleted)
-        .filter(
-          (pm) =>
-            currentUser.role === Role.ADMIN || myProjectIds.has(pm.project.id),
-        )
+        .filter((pm) => isAdmin || myProjectIds.has(pm.project.id))
         .map((pm) => ({
           id: pm.project.id,
           name: pm.project.name,
@@ -114,9 +109,11 @@ export class UserService {
         email: u.email,
         role: u.role,
         createdAt: u.createdAt,
-        totalTasks: u._count.assignedTasks,
-        totalProjects: visibleProjects.length,
-        projects: visibleProjects,
+        // PRIVACY ENFORCEMENT:
+        // Task counts aur total projects sirf ADMIN ko bhejenge
+        totalTasks: isAdmin ? u._count.assignedTasks : null,
+        totalProjects: isAdmin ? u._count.projectMembers : null,
+        projects: visibleProjects, // Regular user ke liye yeh sirf shared projects hain
       };
     });
   }
