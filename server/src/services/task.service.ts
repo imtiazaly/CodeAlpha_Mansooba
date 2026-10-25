@@ -132,10 +132,14 @@ export class TaskService {
 
   static async getTasks(query: any, user: CurrentUser) {
     const page = Math.max(1, parseInt(String(query.page || 1), 10));
+    
+    const HARD_LIMIT = 500;
+    const DEFAULT_LIMIT = 20;
     const limit = Math.max(
       1,
-      Math.min(100, parseInt(String(query.limit || 10), 10)),
+      Math.min(HARD_LIMIT, parseInt(String(query.limit || DEFAULT_LIMIT), 10)),
     );
+
     const sortBy = (query.sortBy as string) || "createdAt";
     const sortOrder: "asc" | "desc" =
       query.sortOrder === "asc" ? "asc" : "desc";
