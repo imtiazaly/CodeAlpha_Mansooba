@@ -6,16 +6,25 @@ const router = Router();
 
 router.use(authenticate);
 
-// GET /api/v1/users (Team Members Directory)
+// Team Members Directory
 router.get("/", UserController.getOrganizationMembers);
 
-// POST /api/v1/users/invite (Admin only)
+// Settings: Update profile name
+router.patch("/profile", UserController.updateProfile);
+
+// Settings: Change password
+router.patch("/change-password", UserController.changePassword);
+
+// Settings: Admin — Update organization name
+router.patch("/organization", UserController.updateOrganization);
+
+// Invite new member (Admin only)
 router.post("/invite", UserController.inviteUser);
 
-// GET /api/v1/users/search?q=
+// Search users
 router.get("/search", UserController.searchUsers);
 
-// GET /api/v1/users/:id
+// Get user by ID
 router.get("/:id", UserController.getUserById);
 
 export const userRoutes = router;

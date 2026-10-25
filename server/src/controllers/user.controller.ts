@@ -19,6 +19,36 @@ export class UserController {
     },
   );
 
+  // PATCH /users/profile — Update name
+  static updateProfile = asyncHandler(async (req: Request, res: Response) => {
+    const updatedUser = await UserService.updateProfile(req.user!.id, req.body);
+    res
+      .status(200)
+      .json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
+  });
+
+  // PATCH /users/change-password — Change password
+  static changePassword = asyncHandler(async (req: Request, res: Response) => {
+    const result = await UserService.changePassword(req.user!.id, req.body);
+    res
+      .status(200)
+      .json(new ApiResponse(200, result, "Password changed successfully"));
+  });
+
+  // PATCH /users/organization — Admin: Rename org
+  static updateOrganization = asyncHandler(
+    async (req: Request, res: Response) => {
+      const org = await UserService.updateOrganization(
+        req.user!.id,
+        req.user!.role,
+        req.body,
+      );
+      res
+        .status(200)
+        .json(new ApiResponse(200, org, "Organization updated successfully"));
+    },
+  );
+
   static inviteUser = asyncHandler(async (req: Request, res: Response) => {
     const newUser = await UserService.inviteUser(req.body, req.user!);
     res

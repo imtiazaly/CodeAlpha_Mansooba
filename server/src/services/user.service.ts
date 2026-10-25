@@ -20,7 +20,6 @@ export class UserService {
     let myProjectIds = new Set<string>();
 
     if (!isAdmin) {
-      // 1. Current user kin projects mein shamil hai
       const [memberships, ownedProjects] = await Promise.all([
         prisma.projectMember.findMany({
           where: { userId: currentUser.id },
@@ -37,7 +36,6 @@ export class UserService {
         ...ownedProjects.map((p) => p.id),
       ]);
 
-      // 2. Un projects ke co-workers nikalein
       const [coMembers, projectOwners] = await Promise.all([
         prisma.projectMember.findMany({
           where: { projectId: { in: Array.from(myProjectIds) } },
@@ -56,12 +54,10 @@ export class UserService {
       ]);
     }
 
-    // ── Fetch Users ──
     const users = await prisma.user.findMany({
       where: {
         isActive: true,
         ...whereOrg,
-        // Regular USER ko sirf co-workers dikhein
         ...(allowedUserIds ? { id: { in: Array.from(allowedUserIds) } } : {}),
       },
       select: {
@@ -93,7 +89,6 @@ export class UserService {
     });
 
     return users.map((u) => {
-      // Filter projects: Regular user ko sirf wahi projects dikhein jo shared hon
       const visibleProjects = u.projectMembers
         .filter((pm) => !pm.project.isDeleted)
         .filter((pm) => isAdmin || myProjectIds.has(pm.project.id))
@@ -109,16 +104,113 @@ export class UserService {
         email: u.email,
         role: u.role,
         createdAt: u.createdAt,
-        // PRIVACY ENFORCEMENT:
-        // Task counts aur total projects sirf ADMIN ko bhejenge
         totalTasks: isAdmin ? u._count.assignedTasks : null,
         totalProjects: isAdmin ? u._count.projectMembers : null,
-        projects: visibleProjects, // Regular user ke liye yeh sirf shared projects hain
+        projects: visibleProjects,
       };
     });
   }
 
-  // 2. Invite / Add Member (Only for Admin)
+  // 2. Update Profile (Name only)
+  static async updateProfile(userId: string, data: { name: string }) {
+    if (!data.name || data.name.trim().length < 2) {
+      throw new ApiError(400, "Name must be at least 2 characters");
+    }
+
+    return prisma.user.update({
+      where: { id: userId },
+      data: { name: data.name.trim() },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        organizationId: true,
+        organization: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
+    });
+  }
+
+  // 3. Change Password (Current password verify karke)
+  static async changePassword(
+    userId: string,
+    data: { currentPassword: string; newPassword: string },
+  ) {
+    if (!data.newPassword || data.newPassword.length < 8) {
+      throw new ApiError(400, "New password must be at least 8 characters");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { password: true },
+    });
+
+    if (!user) throw new ApiError(404, "User not found");
+
+    const isValid = await bcrypt.compare(data.currentPassword, user.password);
+    if (!isValid) {
+      throw new ApiError(401, "Current password is incorrect");
+    }
+
+    // Same password check
+    const isSame = await bcrypt.compare(data.newPassword, user.password);
+    if (isSame) {
+      throw new ApiError(
+        400,
+        "New password cannot be same as current password",
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(data.newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    return { message: "Password changed successfully" };
+  }
+
+  // 4. Update Organization Name (Admin only)
+  static async updateOrganization(
+    userId: string,
+    userRole: Role,
+    data: { name: string },
+  ) {
+    if (userRole !== Role.ADMIN) {
+      throw new ApiError(
+        403,
+        "Only administrators can update organization details",
+      );
+    }
+
+    if (!data.name || data.name.trim().length < 2) {
+      throw new ApiError(
+        400,
+        "Organization name must be at least 2 characters",
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true },
+    });
+
+    if (!user?.organizationId) {
+      throw new ApiError(404, "No organization found for this account");
+    }
+
+    return prisma.organization.update({
+      where: { id: user.organizationId },
+      data: { name: data.name.trim() },
+      select: { id: true, name: true, slug: true },
+    });
+  }
+
+  // 5. Invite / Add Member (Only for Admin)
   static async inviteUser(
     data: { name: string; email: string; role?: Role; password?: string },
     adminUser: { id: string; role: Role },
@@ -161,7 +253,7 @@ export class UserService {
     });
   }
 
-  // 3. Search users (existing function)
+  // 6. Search users
   static async searchUsers(
     query: string,
     currentUserId: string,
@@ -187,6 +279,7 @@ export class UserService {
     });
   }
 
+  // 7. Get user by ID
   static async getUserById(id: string) {
     const user = await prisma.user.findFirst({
       where: { id, isActive: true },
