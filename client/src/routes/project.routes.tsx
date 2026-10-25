@@ -4,6 +4,7 @@ import { ProjectDetail } from "../pages/projects/ProjectDetail";
 import { MyTasks } from "../pages/tasks/MyTasks";
 import { InboxPage } from "../pages/notifications/InboxPage";
 import { MembersPage } from "../pages/members/MembersPage";
+import { SettingsPage } from "../pages/settings/SettingsPage";
 
 export const projectRoutes: RouteObject[] = [
   { path: "/", element: <Dashboard /> },
@@ -11,4 +12,5 @@ export const projectRoutes: RouteObject[] = [
   { path: "/my-tasks", element: <MyTasks /> },
   { path: "/inbox", element: <InboxPage /> },
   { path: "/members", element: <MembersPage /> },
+  { path: "/settings", element: <SettingsPage /> },
 ];

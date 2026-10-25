@@ -11,6 +11,8 @@ import {
   Users,
   X,
   PanelLeftClose,
+  Building2,
+  Settings,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import { logout } from "../../store/slices/authSlice";
@@ -43,7 +45,6 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
     (state) => state.ui,
   );
 
-  // Unread notification count for badge
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["notifications"],
     queryFn: async () => {
@@ -63,6 +64,8 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
   const handleNavClick = () => {
     dispatch(closeMobileSidebar());
   };
+
+  const orgName = user?.organization?.name || "Mansooba Organization";
 
   return (
     <>
@@ -86,7 +89,7 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
             : "md:w-64 md:opacity-100"
         }`}
       >
-        {/* Brand Header */}
+        {/* 1. Brand Header */}
         <div className="h-14 border-b border-[#27272a] flex items-center justify-between px-4 shrink-0">
           <Link
             to="/"
@@ -112,7 +115,6 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
             >
               <PanelLeftClose className="w-4 h-4" />
             </button>
-
             <button
               onClick={() => dispatch(closeMobileSidebar())}
               className="md:hidden text-zinc-400 hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
@@ -123,9 +125,39 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
           </div>
         </div>
 
-        {/* Navigation Links */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-          {/* --- OVERVIEW --- */}
+        {/* 2. Active Organization Workspace Card */}
+        <div className="px-3 pt-3.5 pb-1 shrink-0">
+          <div className="p-2.5 rounded-xl bg-[#121214] border border-[#27272a] hover:border-zinc-700 flex items-center justify-between gap-2.5 transition-colors">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4 text-indigo-400" />
+              </div>
+              <div className="min-w-0">
+                <p
+                  className="text-xs font-semibold text-zinc-100 truncate"
+                  title={orgName}
+                >
+                  {orgName}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <p className="text-[10px] text-zinc-400 font-mono truncate">
+                    {user?.role === "ADMIN"
+                      ? "Admin Workspace"
+                      : "Team Workspace"}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 shrink-0">
+              ORG
+            </span>
+          </div>
+        </div>
+
+        {/* 3. Navigation Links */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+          {/* OVERVIEW */}
           <div>
             <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-2 mb-1.5">
               Overview
@@ -143,7 +175,7 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
             </nav>
           </div>
 
-          {/* --- MY WORK --- */}
+          {/* MY WORK */}
           <div>
             <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-2 mb-1.5">
               My Work
@@ -176,7 +208,7 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
             </nav>
           </div>
 
-          {/* --- WORKSPACE --- */}
+          {/* WORKSPACE */}
           <div>
             <div className="flex items-center justify-between px-2 mb-1.5">
               <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
@@ -206,7 +238,6 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
                 All Projects
               </NavLink>
 
-              {/* Naya Team Members Link */}
               <NavLink
                 to="/members"
                 onClick={handleNavClick}
@@ -230,8 +261,25 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
           </div>
         </div>
 
-        {/* Bottom: User Profile & Logout */}
-        <div className="border-t border-[#27272a] p-3 shrink-0">
+        {/* 4. Bottom: User Profile + Settings + Logout */}
+        <div className="border-t border-[#27272a] p-3 shrink-0 space-y-2">
+          {/* Settings Link */}
+          <NavLink
+            to="/settings"
+            onClick={handleNavClick}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors w-full ${
+                isActive
+                  ? "bg-zinc-800/80 text-zinc-100 border border-zinc-700/60"
+                  : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent"
+              }`
+            }
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </NavLink>
+
+          {/* User Profile Card */}
           <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800/60">
             <div className="flex items-center gap-2.5 overflow-hidden">
               <div className="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
