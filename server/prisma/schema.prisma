@@ -49,8 +49,9 @@ model Organization {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  users     User[]
-  projects  Project[]
+  users       User[]
+  projects    Project[]
+  memberships UserOrganizationMembership[]
 
   @@map("organizations")
 }
@@ -76,6 +77,7 @@ model User {
   assignedTasks   Task[]           @relation("TaskAssignee")
   comments        Comment[]
   notifications   Notification[]   @relation("UserNotifications")
+  orgMemberships  UserOrganizationMembership[] 
 
   @@index([organizationId])
   @@map("users")
@@ -188,4 +190,19 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@map("notifications")
+}
+
+model UserOrganizationMembership {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  joinedAt       DateTime     @default(now())
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@map("user_organization_memberships")
 }
