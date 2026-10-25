@@ -7,7 +7,9 @@ export type NotificationType =
   | "TASK_ASSIGNED"
   | "TASK_STATUS_CHANGED"
   | "COMMENT_ADDED"
-  | "PROJECT_INVITATION";
+  | "PROJECT_INVITATION"
+  | "PROJECT_REMOVED"
+  | "TASK_UNASSIGNED";
 
 // User
 export interface User {

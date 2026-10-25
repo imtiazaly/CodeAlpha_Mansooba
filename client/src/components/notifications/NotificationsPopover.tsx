@@ -4,6 +4,15 @@ import { CheckCheck, BellOff, X } from "lucide-react";
 import { apiClient } from "../../api/axios";
 import type { Notification } from "../../types";
 
+const TYPE_ICONS: Record<string, string> = {
+  TASK_ASSIGNED: "📋",
+  TASK_STATUS_CHANGED: "🔄",
+  COMMENT_ADDED: "💬",
+  PROJECT_INVITATION: "📁",
+  PROJECT_REMOVED: "🚪",
+  TASK_UNASSIGNED: "👤",
+};
+
 interface NotificationsPopoverProps {
   isOpen: boolean;
   onClose: () => void;
@@ -18,7 +27,6 @@ export const NotificationsPopover = ({
   const popoverRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  // Close when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -36,7 +44,6 @@ export const NotificationsPopover = ({
 
   if (!isOpen) return null;
 
-  // Mark all as read
   const handleMarkAllRead = async () => {
     try {
       await apiClient.patch("/notifications/read-all");
@@ -46,7 +53,6 @@ export const NotificationsPopover = ({
     }
   };
 
-  // Mark single notification as read
   const handleMarkAsRead = async (id: string, isRead: boolean) => {
     if (isRead) return;
     try {
@@ -113,27 +119,34 @@ export const NotificationsPopover = ({
                   : "hover:bg-zinc-900/60"
               }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <p
-                  className={`font-medium ${
-                    !n.isRead ? "text-indigo-200" : "text-zinc-300"
-                  }`}
-                >
-                  {n.title}
-                </p>
-                {!n.isRead && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0 mt-1" />
-                )}
+              <div className="flex items-start gap-2.5">
+                <span className="text-sm shrink-0 mt-0.5">
+                  {TYPE_ICONS[n.type] || "🔔"}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-1">
+                    <p
+                      className={`font-medium leading-tight ${
+                        !n.isRead ? "text-indigo-200" : "text-zinc-300"
+                      }`}
+                    >
+                      {n.title}
+                    </p>
+                    {!n.isRead && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0 mt-1" />
+                    )}
+                  </div>
+                  <p className="text-zinc-400 text-[11px] mt-0.5 leading-snug">
+                    {n.message}
+                  </p>
+                  <span className="text-[10px] text-zinc-500 font-mono mt-1 block">
+                    {new Date(n.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
               </div>
-              <p className="text-zinc-400 text-[11px] mt-0.5 leading-snug">
-                {n.message}
-              </p>
-              <span className="text-[10px] text-zinc-500 font-mono mt-1.5 block">
-                {new Date(n.createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
             </div>
           ))
         )}

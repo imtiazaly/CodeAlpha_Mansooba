@@ -9,6 +9,8 @@ const TYPE_ICONS: Record<string, string> = {
   TASK_STATUS_CHANGED: "🔄",
   COMMENT_ADDED: "💬",
   PROJECT_INVITATION: "📁",
+  PROJECT_REMOVED: "🚪",
+  TASK_UNASSIGNED: "👤",
 };
 
 export const InboxPage = () => {
