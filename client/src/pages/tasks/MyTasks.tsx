@@ -26,13 +26,17 @@ export const MyTasks = () => {
     queryKey: ["my-tasks", user?.id],
     queryFn: async () => {
       const res =
-        await apiClient.get<ApiResponse<{ tasks: Task[] }>>(`/tasks?limit=100`);
+        await apiClient.get<ApiResponse<{ tasks: Task[] | null }>>(
+          `/tasks?limit=100`,
+        );
+      console.log("MyTasks data:", res);
       return res.data.data?.tasks || [];
     },
     enabled: !!user?.id,
   });
 
   const tasks = data || [];
+  console.log("MyTasks tasks:", tasks);
   const todo = tasks.filter((t) => t.status === "TODO");
   const inProgress = tasks.filter((t) => t.status === "IN_PROGRESS");
   const done = tasks.filter((t) => t.status === "DONE");
