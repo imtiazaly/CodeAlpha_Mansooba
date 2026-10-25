@@ -40,6 +40,19 @@ enum NotificationType {
   PROJECT_INVITATION
 }
 
+model Organization {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  users     User[]
+  projects  Project[]
+
+  @@map("organizations")
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -50,6 +63,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Multi-tenant organization link
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   // Relations
   ownedProjects   Project[]        @relation("ProjectOwner")
   projectMembers  ProjectMember[]
@@ -58,6 +75,7 @@ model User {
   comments        Comment[]
   notifications   Notification[]   @relation("UserNotifications")
 
+  @@index([organizationId])
   @@map("users")
 }
 
@@ -69,12 +87,17 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Multi-tenant organization link
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   ownerId     String
   owner       User     @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   members     ProjectMember[]
   tasks       Task[]
 
+  @@index([organizationId])
   @@index([ownerId])
   @@index([isDeleted])
   @@map("projects")
@@ -103,17 +126,15 @@ model Task {
   description String?
   status      TaskStatus @default(TODO)
   priority    Priority   @default(MEDIUM)
-  order       Float      @default(0) // Kanban board card ordering
+  order       Float      @default(0)
   dueDate     DateTime?
   isDeleted   Boolean    @default(false)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  // Project relation
   projectId   String
   project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  // Creator & Assignee
   creatorId   String
   creator     User       @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
 
