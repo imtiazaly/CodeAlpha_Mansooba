@@ -17,6 +17,8 @@ import {
   Mail,
   Calendar,
   FolderKanban,
+  UserCheck,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,12 +52,21 @@ export const MembersPage = () => {
 
   // Invite modal state (Admin only)
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("USER");
   const [isInviting, setIsInviting] = useState(false);
 
-  // Fetch Members
+  // Email lookup state
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [foundUser, setFoundUser] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    role: Role;
+  } | null>(null);
+  const [emailChecked, setEmailChecked] = useState(false);
+
   const { data: members = [], isLoading } = useQuery<MemberItem[]>({
     queryKey: ["organization-members"],
     queryFn: async () => {
@@ -64,7 +75,6 @@ export const MembersPage = () => {
     },
   });
 
-  // Filter logic
   const filtered = members.filter((m) => {
     const matchSearch =
       m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -77,8 +87,67 @@ export const MembersPage = () => {
   const adminCount = members.filter((m) => m.role === "ADMIN").length;
   const userCount = members.filter((m) => m.role === "USER").length;
 
+  // Reset invite modal
+  const resetInviteModal = () => {
+    setInviteEmail("");
+    setInviteName("");
+    setInviteRole("USER");
+    setFoundUser(null);
+    setEmailChecked(false);
+    setIsInviteOpen(false);
+  };
+
+  // Email lookup (check if user already exists)
+  const handleEmailLookup = async () => {
+    if (!inviteEmail.trim()) return;
+    setIsLookingUp(true);
+    setFoundUser(null);
+    setEmailChecked(false);
+    try {
+      const res = await apiClient.get(
+        `/users/search?q=${encodeURIComponent(inviteEmail.trim())}&limit=1`,
+      );
+      const results = res.data.data || [];
+      const exact = results.find(
+        (u: any) => u.email.toLowerCase() === inviteEmail.trim().toLowerCase(),
+      );
+      if (exact) {
+        setFoundUser(exact);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsLookingUp(false);
+      setEmailChecked(true);
+    }
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Existing user case: only email needed
+    if (foundUser) {
+      try {
+        setIsInviting(true);
+        await apiClient.post("/users/invite", {
+          name: foundUser.name,
+          email: foundUser.email,
+        });
+        toast.success(
+          `${foundUser.name} has been added to your workspace! They can switch to this workspace from their account.`,
+          { duration: 5000 },
+        );
+        resetInviteModal();
+        queryClient.invalidateQueries({ queryKey: ["organization-members"] });
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || "Failed to add member");
+      } finally {
+        setIsInviting(false);
+      }
+      return;
+    }
+
+    // New user case
     if (!inviteName.trim() || !inviteEmail.trim()) {
       toast.error("Name and Email are required");
       return;
@@ -91,12 +160,8 @@ export const MembersPage = () => {
         email: inviteEmail.trim().toLowerCase(),
         role: inviteRole,
       });
-
-      toast.success(`${inviteName} added to the organization!`);
-      setIsInviteOpen(false);
-      setInviteName("");
-      setInviteEmail("");
-      setInviteRole("USER");
+      toast.success(`${inviteName} has been added to your workspace!`);
+      resetInviteModal();
       queryClient.invalidateQueries({ queryKey: ["organization-members"] });
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to add member");
@@ -107,7 +172,6 @@ export const MembersPage = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#09090b]">
-      {/* Header */}
       <Header
         title={isAdmin ? "Team Directory" : "Project Teammates"}
         subtitle={
@@ -129,7 +193,7 @@ export const MembersPage = () => {
       />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 pb-16">
-        {/* ── Top Summary Stats ── */}
+        {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
@@ -156,7 +220,6 @@ export const MembersPage = () => {
                   <p className="text-[11px] text-zinc-500">Administrators</p>
                 </div>
               </div>
-
               <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
                   <Briefcase className="w-5 h-5 text-emerald-400" />
@@ -184,7 +247,6 @@ export const MembersPage = () => {
                   <p className="text-[11px] text-zinc-500">Active Workspaces</p>
                 </div>
               </div>
-
               <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
                   <Shield className="w-5 h-5 text-emerald-400" />
@@ -200,7 +262,7 @@ export const MembersPage = () => {
           )}
         </div>
 
-        {/* ── Search & Filter Bar ── */}
+        {/* Search & Filter */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#121214] border border-[#27272a] p-3 rounded-xl">
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
@@ -212,7 +274,6 @@ export const MembersPage = () => {
               className="w-full bg-[#18181b] border border-[#27272a] rounded-lg pl-9 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
-
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-500" />
             <select
@@ -227,7 +288,7 @@ export const MembersPage = () => {
           </div>
         </div>
 
-        {/* ── Members Table ── */}
+        {/* Members Table */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20 text-xs text-zinc-500">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -243,7 +304,7 @@ export const MembersPage = () => {
         ) : (
           <div className="bg-[#121214] border border-[#27272a] rounded-xl shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-zinc-300 border-collapse min-w-190">
+              <table className="w-full text-left text-xs text-zinc-300 border-collapse min-w-[760px]">
                 <thead>
                   <tr className="bg-[#18181b]/70 border-b border-[#27272a] text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
                     <th className="py-3 px-4">Member</th>
@@ -255,14 +316,11 @@ export const MembersPage = () => {
                     <th className="py-3 px-4 w-36">Joined Date</th>
                   </tr>
                 </thead>
-
                 <tbody className="divide-y divide-[#27272a]/60">
                   {filtered.map((m, index) => {
                     const isPopoverOpen = activeProjectPopover === m.id;
                     const visiblePills = m.projects.slice(0, 2);
                     const remainingCount = m.projects.length - 2;
-
-                    // Agar row aakhri 2-3 rows mein hai to popover oopar khulega (Drop-up)
                     const isNearBottom =
                       index >= Math.max(0, filtered.length - 2);
 
@@ -271,7 +329,6 @@ export const MembersPage = () => {
                         key={m.id}
                         className="hover:bg-zinc-900/40 transition-colors"
                       >
-                        {/* 1. Member Info (Avatar, Name, Email) */}
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-xs font-semibold text-indigo-300 shrink-0">
@@ -288,21 +345,13 @@ export const MembersPage = () => {
                             </div>
                           </div>
                         </td>
-
-                        {/* 2. System Role Badge */}
                         <td className="py-3 px-4 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${
-                              m.role === "ADMIN"
-                                ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                : "bg-zinc-800/80 text-zinc-300 border-zinc-700/60"
-                            }`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${m.role === "ADMIN" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-zinc-800/80 text-zinc-300 border-zinc-700/60"}`}
                           >
                             {m.role === "ADMIN" ? "ADMIN" : "MEMBER"}
                           </span>
                         </td>
-
-                        {/* 3. Projects (Pills with Dynamic Dropup Popover) */}
                         <td className="py-3 px-4 relative">
                           {m.projects.length === 0 ? (
                             <span className="text-zinc-600 text-[11px] italic">
@@ -313,13 +362,12 @@ export const MembersPage = () => {
                               {visiblePills.map((p) => (
                                 <span
                                   key={p.id}
-                                  className="inline-flex items-center text-[10px] bg-[#18181b] border border-[#27272a] text-zinc-300 px-2 py-0.5 rounded max-w-37.5 truncate"
+                                  className="inline-flex items-center text-[10px] bg-[#18181b] border border-[#27272a] text-zinc-300 px-2 py-0.5 rounded max-w-[150px] truncate"
                                   title={`${p.name} (${p.role})`}
                                 >
                                   {p.name}
                                 </span>
                               ))}
-
                               {remainingCount > 0 && (
                                 <div className="relative inline-block">
                                   <button
@@ -332,8 +380,6 @@ export const MembersPage = () => {
                                   >
                                     +{remainingCount} more
                                   </button>
-
-                                  {/* Popover List */}
                                   {isPopoverOpen && (
                                     <>
                                       <div
@@ -343,11 +389,7 @@ export const MembersPage = () => {
                                         className="fixed inset-0 z-40"
                                       />
                                       <div
-                                        className={`absolute left-0 z-50 w-64 bg-[#18181b] border border-[#27272a] rounded-xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150 ${
-                                          isNearBottom
-                                            ? "bottom-full mb-2"
-                                            : "top-full mt-2"
-                                        }`}
+                                        className={`absolute left-0 z-50 w-64 bg-[#18181b] border border-[#27272a] rounded-xl shadow-2xl p-3 animate-in fade-in zoom-in-95 duration-150 ${isNearBottom ? "bottom-full mb-2" : "top-full mt-2"}`}
                                       >
                                         <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#27272a]">
                                           <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
@@ -387,8 +429,6 @@ export const MembersPage = () => {
                             </div>
                           )}
                         </td>
-
-                        {/* 4. Workload / Tasks (Admin Only) */}
                         {isAdmin && (
                           <td className="py-3 px-4 whitespace-nowrap">
                             {m.totalTasks !== null ? (
@@ -401,8 +441,6 @@ export const MembersPage = () => {
                             )}
                           </td>
                         )}
-
-                        {/* 5. Joined Date */}
                         <td className="py-3 px-4 whitespace-nowrap">
                           <span className="flex items-center gap-1.5 text-zinc-400 text-[11px] font-mono">
                             <Calendar className="w-3 h-3 text-zinc-600" />
@@ -428,93 +466,154 @@ export const MembersPage = () => {
         )}
       </div>
 
-      {/* ── Modal: Invite New Member (Admin Only) ── */}
+      {/* ── Invite Modal ── */}
       {isInviteOpen && (
         <div
           onClick={(e) => {
-            if (e.target === e.currentTarget) setIsInviteOpen(false);
+            if (e.target === e.currentTarget) resetInviteModal();
           }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-in fade-in duration-200"
         >
           <div className="w-full max-w-md bg-[#121214] border border-[#27272a] rounded-xl shadow-2xl p-6 relative">
             <button
-              onClick={() => setIsInviteOpen(false)}
+              onClick={resetInviteModal}
               className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
             <h3 className="text-base font-semibold text-zinc-100 mb-1">
-              Add Team Member
+              Add Member to Workspace
             </h3>
-            <p className="text-xs text-zinc-400 mb-4">
-              Add a new member to your organization workspace
+            <p className="text-xs text-zinc-400 mb-5">
+              Enter an email address. Existing Mansooba users will be directly
+              added to your workspace.
             </p>
 
             <form onSubmit={handleInvite} className="space-y-4">
+              {/* Email + Lookup */}
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                  placeholder="e.g. Asad Rehman"
-                  required
-                  className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                   Email Address *
                 </label>
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="asad@example.com"
-                  required
-                  className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => {
+                      setInviteEmail(e.target.value);
+                      setFoundUser(null);
+                      setEmailChecked(false);
+                    }}
+                    placeholder="member@company.com"
+                    required
+                    className="flex-1 bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleEmailLookup}
+                    disabled={isLookingUp || !inviteEmail.trim()}
+                    className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs text-zinc-300 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                  >
+                    {isLookingUp ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Search className="w-3.5 h-3.5" />
+                    )}
+                    Lookup
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                  Organization Role
-                </label>
-                <select
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as Role)}
-                  className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="USER">Standard Member</option>
-                  <option value="ADMIN">Administrator</option>
-                </select>
-                <p className="text-[10px] text-zinc-500 mt-1">
-                  Default login password will be:{" "}
-                  <code className="text-zinc-300">Password123!</code>
-                </p>
-              </div>
+              {/* Result: Existing User Found */}
+              {emailChecked && foundUser && (
+                <div className="p-3 bg-emerald-950/20 border border-emerald-500/25 rounded-lg flex items-start gap-3">
+                  <UserCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-emerald-300">
+                      Existing Mansooba User Found
+                    </p>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      <span className="text-zinc-200 font-medium">
+                        {foundUser.name}
+                      </span>{" "}
+                      ({foundUser.email})
+                    </p>
+                    <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
+                      <Info className="w-3 h-3" />
+                      They will be added to your workspace. Their active
+                      workspace won't change — they can switch using the
+                      workspace switcher.
+                    </p>
+                  </div>
+                </div>
+              )}
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              {/* Result: New User (show name + role fields) */}
+              {emailChecked && !foundUser && (
+                <>
+                  <div className="p-3 bg-blue-950/20 border border-blue-500/20 rounded-lg flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-zinc-400">
+                      No existing user found with this email. A new account will
+                      be created with the default password{" "}
+                      <code className="text-zinc-300">Password123!</code>
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={inviteName}
+                      onChange={(e) => setInviteName(e.target.value)}
+                      placeholder="e.g. Sara Ahmed"
+                      required
+                      className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                      System Role
+                    </label>
+                    <select
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value as Role)}
+                      className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="USER">Standard Member</option>
+                      <option value="ADMIN">Administrator</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#27272a]">
                 <button
                   type="button"
-                  onClick={() => setIsInviteOpen(false)}
+                  onClick={resetInviteModal}
                   className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isInviting}
+                  disabled={
+                    isInviting ||
+                    !emailChecked ||
+                    (!foundUser && !inviteName.trim())
+                  }
                   className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {isInviting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : foundUser ? (
+                    "Add to Workspace"
                   ) : (
-                    "Add Member"
+                    "Create & Add Member"
                   )}
                 </button>
               </div>

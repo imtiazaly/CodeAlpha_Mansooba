@@ -211,30 +211,86 @@ export class UserService {
   }
 
   // 5. Invite / Add Member (Only for Admin)
+  // 5. Invite User — Handles BOTH existing and new users
   static async inviteUser(
     data: { name: string; email: string; role?: Role; password?: string },
     adminUser: { id: string; role: Role },
   ) {
     if (adminUser.role !== Role.ADMIN) {
-      throw new ApiError(403, "Only admins can add new members");
+      throw new ApiError(403, "Only admins can invite members");
     }
 
-    const existing = await prisma.user.findUnique({
-      where: { email: data.email },
-    });
-    if (existing) {
-      throw new ApiError(400, "User with this email already exists");
-    }
-
+    // Admin ki organization fetch karo
     const admin = await prisma.user.findUnique({
       where: { id: adminUser.id },
-      select: { organizationId: true },
+      select: {
+        organizationId: true,
+        organization: { select: { name: true } },
+      },
     });
 
+    if (!admin?.organizationId) {
+      throw new ApiError(400, "Admin does not belong to any organization");
+    }
+
+    // ── CASE A: User already exists in the system ──
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    if (existingUser) {
+      // Check: kya ye user pehle se is org ka member hai?
+      const alreadyMember = await prisma.userOrganizationMembership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: existingUser.id,
+            organizationId: admin.organizationId,
+          },
+        },
+      });
+
+      if (alreadyMember) {
+        throw new ApiError(
+          409,
+          `${existingUser.name} is already a member of this workspace`,
+        );
+      }
+
+      // Org membership create karo (active org change nahi hogi — user khud switch karega)
+      await prisma.userOrganizationMembership.create({
+        data: {
+          userId: existingUser.id,
+          organizationId: admin.organizationId,
+        },
+      });
+
+      // Notification bhejo
+      await prisma.notification.create({
+        data: {
+          userId: existingUser.id,
+          type: "PROJECT_INVITATION",
+          title: "Added to New Workspace",
+          message: `You have been added to "${admin.organization?.name}" workspace. Switch workspaces to access it.`,
+        },
+      });
+
+      return {
+        ...existingUser,
+        _isExistingUser: true,
+      };
+    }
+
+    // ── CASE B: New user — create account + membership ──
     const defaultPassword = data.password || "Password123!";
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    // Transaction: User + Membership ek sath banao
     return prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
@@ -242,7 +298,7 @@ export class UserService {
           email: data.email,
           password: hashedPassword,
           role: data.role || Role.USER,
-          organizationId: admin?.organizationId || null,
+          organizationId: admin.organizationId,
           isActive: true,
         },
         select: {
@@ -254,19 +310,17 @@ export class UserService {
         },
       });
 
-      // Membership bhi create karo
-      if (admin?.organizationId) {
-        await tx.userOrganizationMembership.create({
-          data: {
-            userId: newUser.id,
-            organizationId: admin.organizationId,
-          },
-        });
-      }
+      await tx.userOrganizationMembership.create({
+        data: {
+          userId: newUser.id,
+          organizationId: admin.organizationId!,
+        },
+      });
 
-      return newUser;
+      return { ...newUser, _isExistingUser: false };
     });
   }
+
   // 6. Search users
   static async searchUsers(
     query: string,
