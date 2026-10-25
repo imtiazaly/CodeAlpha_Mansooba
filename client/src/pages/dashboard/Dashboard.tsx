@@ -1,15 +1,18 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
-import { Plus, FolderKanban } from "lucide-react";
+import { Plus, FolderKanban, Building2 } from "lucide-react";
 import { Header } from "../../components/layout/Header";
 import { ProjectCard } from "../../components/projects/ProjectCard";
 import { apiClient } from "../../api/axios";
+import { useAppSelector } from "../../store";
 import type { ApiResponse, Project } from "../../types";
-import { useState } from "react";
 import { EditProjectModal } from "../../components/projects/EditProjectModal";
 
 export const Dashboard = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const currentUser = useAppSelector((state) => state.auth.user);
+  const orgName = currentUser?.organization?.name || "Mansooba Organization";
 
   const { openCreateProject } = useOutletContext<{
     openCreateProject: () => void;
@@ -27,24 +30,57 @@ export const Dashboard = () => {
     },
   });
 
+  const projectCount = projects?.length || 0;
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#09090b]">
       {/* Top Header */}
       <Header
         title="Projects Dashboard"
-        subtitle="Manage and track all your team workspaces"
+        subtitle={`Workspace: ${orgName} • ${projectCount} Projects`}
         actions={
           <button
             onClick={openCreateProject}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Project</span>
           </button>
         }
       />
+
       {/* Main Body */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        {/* Workspace Quick Context Banner */}
+        <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-600/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-zinc-100">
+                  {orgName}
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Active
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                {currentUser?.role === "ADMIN"
+                  ? "Organization Administrator"
+                  : "Standard Team Member"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end text-xs text-zinc-400 font-mono">
+            <span className="bg-[#18181b] border border-[#27272a] px-3 py-1.5 rounded-lg">
+              {projectCount} Projects Active
+            </span>
+          </div>
+        </div>
+
         {/* Loading Skeletons */}
         {isLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -109,7 +145,7 @@ export const Dashboard = () => {
                 <ProjectCard
                   key={project.id}
                   project={project}
-                  onEdit={(p) => setEditingProject(p)} // <-- yeh add karein
+                  onEdit={(p) => setEditingProject(p)}
                 />
               ))}
             </div>
