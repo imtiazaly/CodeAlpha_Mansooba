@@ -39,10 +39,24 @@ export const authenticate = async (
       throw new ApiError(401, "Invalid authentication token");
     }
 
-    // Check karein ke user DB me maujood aur active hai
+    // Check karein ke user DB me maujood aur active hai (with Organization)
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, role: true, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        organizationId: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
     });
 
     if (!user || !user.isActive) {
@@ -52,7 +66,10 @@ export const authenticate = async (
     req.user = {
       id: user.id,
       email: user.email,
+      name: user.name,
       role: user.role,
+      organizationId: user.organizationId,
+      organization: user.organization,
     };
 
     next();

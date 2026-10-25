@@ -33,7 +33,7 @@ export class AuthService {
         email: input.email,
         password: hashedPassword,
         name: input.name,
-        role: Role.USER, // Har naya user hamesha USER banega
+        role: Role.USER,
       },
       select: {
         id: true,
@@ -41,6 +41,14 @@ export class AuthService {
         name: true,
         role: true,
         createdAt: true,
+        organizationId: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
       },
     });
 
@@ -52,6 +60,15 @@ export class AuthService {
   static async login(input: LoginInput) {
     const user = await prisma.user.findUnique({
       where: { email: input.email },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
     });
 
     if (!user || !user.isActive) {
@@ -72,6 +89,8 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        organizationId: user.organizationId,
+        organization: user.organization,
         createdAt: user.createdAt,
       },
       token,

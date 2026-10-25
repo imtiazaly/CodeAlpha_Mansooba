@@ -6,7 +6,14 @@ declare global {
       user?: {
         id: string;
         email: string;
+        name?: string;
         role: Role;
+        organizationId?: string | null;
+        organization?: {
+          id: string;
+          name: string;
+          slug: string;
+        } | null;
       };
     }
   }
