@@ -22,7 +22,7 @@ export class UserController {
   // PATCH /users/members/:userId/role — Update member role (Admin only)
   static updateMemberRole = asyncHandler(
     async (req: Request, res: Response) => {
-      const { userId } = req.params;
+      const userId = req.params.userId as string;
       const { role } = req.body;
 
       if (!role || (role !== "ADMIN" && role !== "USER")) {
@@ -43,7 +43,7 @@ export class UserController {
   // DELETE /users/members/:userId — Remove member from organization (Admin only)
   static removeOrganizationMember = asyncHandler(
     async (req: Request, res: Response) => {
-      const { userId } = req.params;
+      const userId = req.params.userId as string;
       const result = await UserService.removeOrganizationMember(
         userId,
         req.user!

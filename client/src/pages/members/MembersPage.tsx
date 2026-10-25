@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "../../components/layout/Header";
 import { apiClient } from "../../api/axios";
 import { useAppSelector } from "../../store";
@@ -19,6 +19,9 @@ import {
   FolderKanban,
   UserCheck,
   Info,
+  UserCog,
+  UserMinus,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -67,11 +70,55 @@ export const MembersPage = () => {
   } | null>(null);
   const [emailChecked, setEmailChecked] = useState(false);
 
+  // ── Member CRUD Modals State ──
+  const [roleModalMember, setRoleModalMember] = useState<MemberItem | null>(
+    null,
+  );
+  const [selectedNewRole, setSelectedNewRole] = useState<Role>("USER");
+
+  const [removeModalMember, setRemoveModalMember] = useState<MemberItem | null>(
+    null,
+  );
+
+  // Fetch Members
   const { data: members = [], isLoading } = useQuery<MemberItem[]>({
     queryKey: ["organization-members"],
     queryFn: async () => {
       const res = await apiClient.get<ApiResponse<MemberItem[]>>("/users");
       return res.data.data || [];
+    },
+  });
+
+  // ── Update Member Role Mutation ──
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: Role }) =>
+      apiClient.patch(`/users/members/${userId}/role`, { role }),
+    onSuccess: (res, vars) => {
+      toast.success(
+        `Role updated to ${vars.role === "ADMIN" ? "Administrator" : "Member"}!`,
+      );
+      setRoleModalMember(null);
+      queryClient.invalidateQueries({ queryKey: ["organization-members"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || "Failed to update role");
+    },
+  });
+
+  // ── Remove Member Mutation (Safely unlinks from workspace) ──
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId: string) =>
+      apiClient.delete(`/users/members/${userId}`),
+    onSuccess: () => {
+      toast.success(
+        `${removeModalMember?.name} removed from workspace successfully.`,
+      );
+      setRemoveModalMember(null);
+      queryClient.invalidateQueries({ queryKey: ["organization-members"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || "Failed to remove member");
     },
   });
 
@@ -127,7 +174,6 @@ export const MembersPage = () => {
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Existing user case
     if (foundUser) {
       try {
         setIsInviting(true);
@@ -140,7 +186,7 @@ export const MembersPage = () => {
         toast.success(
           `Invitation sent to ${foundUser.name} as ${
             inviteRole === "ADMIN" ? "Administrator" : "Member"
-          }! They will see it on their dashboard.`,
+          }!`,
           { duration: 5000 },
         );
         resetInviteModal();
@@ -153,7 +199,6 @@ export const MembersPage = () => {
       return;
     }
 
-    // New user case
     if (!inviteName.trim() || !inviteEmail.trim()) {
       toast.error("Name and Email are required");
       return;
@@ -167,7 +212,7 @@ export const MembersPage = () => {
         role: inviteRole,
       });
 
-      toast.success(`${inviteName} has been added to your workspace!`);
+      toast.success(`${inviteName} added to the workspace!`);
       resetInviteModal();
       queryClient.invalidateQueries({ queryKey: ["organization-members"] });
     } catch (err: any) {
@@ -183,7 +228,7 @@ export const MembersPage = () => {
         title={isAdmin ? "Team Directory" : "Project Teammates"}
         subtitle={
           isAdmin
-            ? "Manage organization members, system roles, and project allocations"
+            ? "Manage organization members, workspace roles, and project allocations"
             : "Colleagues collaborating with you across shared projects"
         }
         actions={
@@ -319,8 +364,11 @@ export const MembersPage = () => {
                     <th className="py-3 px-4">
                       {isAdmin ? "Assigned Projects" : "Shared Projects"}
                     </th>
-                    {isAdmin && <th className="py-3 px-4 w-36">Workload</th>}
-                    <th className="py-3 px-4 w-36">Joined Date</th>
+                    {isAdmin && <th className="py-3 px-4 w-32">Workload</th>}
+                    <th className="py-3 px-4 w-32">Joined Date</th>
+                    {isAdmin && (
+                      <th className="py-3 px-4 w-28 text-right">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#27272a]/60">
@@ -330,21 +378,30 @@ export const MembersPage = () => {
                     const remainingCount = m.projects.length - 2;
                     const isNearBottom =
                       index >= Math.max(0, filtered.length - 2);
+                    const isSelf = m.id === currentUser?.id;
 
                     return (
                       <tr
                         key={m.id}
                         className="hover:bg-zinc-900/40 transition-colors"
                       >
+                        {/* 1. Member Info */}
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-xs font-semibold text-indigo-300 shrink-0">
                               {m.name.charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-zinc-100 truncate">
-                                {m.name}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-semibold text-zinc-100 truncate">
+                                  {m.name}
+                                </p>
+                                {isSelf && (
+                                  <span className="text-[10px] text-indigo-400 font-mono bg-indigo-950/40 border border-indigo-500/25 px-1.5 py-0.2 rounded">
+                                    You
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-[11px] text-zinc-500 truncate flex items-center gap-1 mt-0.5">
                                 <Mail className="w-3 h-3 shrink-0 text-zinc-600" />
                                 <span>{m.email}</span>
@@ -352,6 +409,8 @@ export const MembersPage = () => {
                             </div>
                           </div>
                         </td>
+
+                        {/* 2. Workspace Role Badge */}
                         <td className="py-3 px-4 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${m.role === "ADMIN" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-zinc-800/80 text-zinc-300 border-zinc-700/60"}`}
@@ -359,6 +418,8 @@ export const MembersPage = () => {
                             {m.role === "ADMIN" ? "ADMIN" : "MEMBER"}
                           </span>
                         </td>
+
+                        {/* 3. Projects */}
                         <td className="py-3 px-4 relative">
                           {m.projects.length === 0 ? (
                             <span className="text-zinc-600 text-[11px] italic">
@@ -436,6 +497,8 @@ export const MembersPage = () => {
                             </div>
                           )}
                         </td>
+
+                        {/* 4. Workload */}
                         {isAdmin && (
                           <td className="py-3 px-4 whitespace-nowrap">
                             {m.totalTasks !== null ? (
@@ -448,6 +511,8 @@ export const MembersPage = () => {
                             )}
                           </td>
                         )}
+
+                        {/* 5. Joined Date */}
                         <td className="py-3 px-4 whitespace-nowrap">
                           <span className="flex items-center gap-1.5 text-zinc-400 text-[11px] font-mono">
                             <Calendar className="w-3 h-3 text-zinc-600" />
@@ -463,6 +528,40 @@ export const MembersPage = () => {
                             </span>
                           </span>
                         </td>
+
+                        {/* 6. Admin Actions (Change Role & Remove from Workspace) */}
+                        {isAdmin && (
+                          <td className="py-3 px-4 whitespace-nowrap text-right">
+                            {isSelf ? (
+                              <span className="text-[10px] text-zinc-600 italic">
+                                No action
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Edit Role */}
+                                <button
+                                  onClick={() => {
+                                    setRoleModalMember(m);
+                                    setSelectedNewRole(m.role);
+                                  }}
+                                  title="Change workspace role"
+                                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+                                >
+                                  <UserCog className="w-4 h-4 text-indigo-400" />
+                                </button>
+
+                                {/* Remove Member */}
+                                <button
+                                  onClick={() => setRemoveModalMember(m)}
+                                  title="Remove member from workspace"
+                                  className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                >
+                                  <UserMinus className="w-4 h-4 text-rose-400/80 hover:text-rose-400" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -473,7 +572,198 @@ export const MembersPage = () => {
         )}
       </div>
 
-      {/* ── Invite Modal with Role Selection ── */}
+      {/* ── Modal 1: Edit Workspace Role ── */}
+      {roleModalMember && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setRoleModalMember(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-in fade-in duration-200"
+        >
+          <div className="w-full max-w-sm bg-[#121214] border border-[#27272a] rounded-xl shadow-2xl p-5 relative">
+            <button
+              onClick={() => setRoleModalMember(null)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-600/15 border border-indigo-500/25 flex items-center justify-center">
+                <UserCog className="w-5 h-5 text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-100">
+                  Update Workspace Role
+                </h3>
+                <p className="text-xs text-zinc-400">{roleModalMember.name}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-400 mb-4">
+              Select permission level for{" "}
+              <strong className="text-zinc-200">{roleModalMember.email}</strong>{" "}
+              in this workspace:
+            </p>
+
+            <div className="space-y-2 mb-5">
+              <label
+                onClick={() => setSelectedNewRole("USER")}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  selectedNewRole === "USER"
+                    ? "bg-indigo-950/30 border-indigo-500/40"
+                    : "bg-[#18181b] border-[#27272a] hover:bg-zinc-800/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  checked={selectedNewRole === "USER"}
+                  onChange={() => setSelectedNewRole("USER")}
+                  className="mt-0.5 text-indigo-600 focus:ring-0"
+                />
+                <div>
+                  <p className="text-xs font-semibold text-zinc-200">
+                    Standard Member
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    Can view and work on assigned projects and tasks.
+                  </p>
+                </div>
+              </label>
+
+              <label
+                onClick={() => setSelectedNewRole("ADMIN")}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  selectedNewRole === "ADMIN"
+                    ? "bg-amber-950/30 border-amber-500/40"
+                    : "bg-[#18181b] border-[#27272a] hover:bg-zinc-800/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  checked={selectedNewRole === "ADMIN"}
+                  onChange={() => setSelectedNewRole("ADMIN")}
+                  className="mt-0.5 text-amber-500 focus:ring-0"
+                />
+                <div>
+                  <p className="text-xs font-semibold text-amber-300">
+                    Administrator
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    Full workspace access, can manage members and all projects.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#27272a]">
+              <button
+                type="button"
+                onClick={() => setRoleModalMember(null)}
+                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  updateRoleMutation.mutate({
+                    userId: roleModalMember.id,
+                    role: selectedNewRole,
+                  })
+                }
+                disabled={
+                  updateRoleMutation.isPending ||
+                  selectedNewRole === roleModalMember.role
+                }
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              >
+                {updateRoleMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : null}
+                Save Role
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal 2: Confirm Remove Member from Workspace ── */}
+      {removeModalMember && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setRemoveModalMember(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-in fade-in duration-200"
+        >
+          <div className="w-full max-w-sm bg-[#121214] border border-[#27272a] rounded-xl shadow-2xl p-5 relative">
+            <button
+              onClick={() => setRemoveModalMember(null)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-100">
+                  Remove from Workspace
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  {removeModalMember.name}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed mb-3">
+              Are you sure you want to remove{" "}
+              <strong className="text-white">{removeModalMember.name}</strong>{" "}
+              from this organization?
+            </p>
+
+            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-[11px] text-zinc-400 space-y-1 mb-5">
+              <p>
+                • They will lose access to all projects and tasks in this
+                workspace.
+              </p>
+              <p>
+                • Their personal Mansooba account will{" "}
+                <strong className="text-zinc-200">NOT</strong> be deleted.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#27272a]">
+              <button
+                type="button"
+                onClick={() => setRemoveModalMember(null)}
+                className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  removeMemberMutation.mutate(removeModalMember.id)
+                }
+                disabled={removeMemberMutation.isPending}
+                className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              >
+                {removeMemberMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <UserMinus className="w-3.5 h-3.5" />
+                )}
+                Remove Member
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal 3: Invite / Add Member ── */}
       {isInviteOpen && (
         <div
           onClick={(e) => {
@@ -498,7 +788,6 @@ export const MembersPage = () => {
             </p>
 
             <form onSubmit={handleInvite} className="space-y-4">
-              {/* Email + Lookup */}
               <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                   Email Address *
@@ -532,7 +821,6 @@ export const MembersPage = () => {
                 </div>
               </div>
 
-              {/* Result: Existing User Found + ROLE SELECTION */}
               {emailChecked && foundUser && (
                 <div className="space-y-3">
                   <div className="p-3 bg-emerald-950/20 border border-emerald-500/25 rounded-lg flex items-start gap-3">
@@ -552,7 +840,6 @@ export const MembersPage = () => {
                     </div>
                   </div>
 
-                  {/* Role Selection for Existing User */}
                   <div>
                     <label className="block text-xs font-medium text-zinc-400 mb-1.5">
                       Assign Workspace Role *
@@ -573,7 +860,6 @@ export const MembersPage = () => {
                 </div>
               )}
 
-              {/* Result: New User (Full Name + Role) */}
               {emailChecked && !foundUser && (
                 <>
                   <div className="p-3 bg-blue-950/20 border border-blue-500/20 rounded-lg flex items-start gap-2">
