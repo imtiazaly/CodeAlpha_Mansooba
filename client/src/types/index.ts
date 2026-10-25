@@ -11,6 +11,13 @@ export type NotificationType =
   | "PROJECT_REMOVED"
   | "TASK_UNASSIGNED";
 
+// Organization
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 // User
 export interface User {
   id: string;
@@ -18,6 +25,8 @@ export interface User {
   email: string;
   role: Role;
   isActive: boolean;
+  organizationId?: string | null;
+  organization?: Organization | null;
   createdAt: string;
   updatedAt: string;
 }
