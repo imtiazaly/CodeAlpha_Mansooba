@@ -8,6 +8,7 @@ import {
   LogOut,
   User as UserIcon,
   FolderKanban,
+  Users,
   X,
   PanelLeftClose,
 } from "lucide-react";
@@ -65,7 +66,7 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
 
   return (
     <>
-      {/* ── Mobile Backdrop (closes sidebar on tap outside) ── */}
+      {/* ── Mobile Backdrop ── */}
       {isMobileSidebarOpen && (
         <div
           onClick={() => dispatch(closeMobileSidebar())}
@@ -76,12 +77,10 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
       {/* ── Sidebar Element ── */}
       <aside
         className={`fixed md:static inset-y-0 left-0 z-50 bg-[#0c0c0e] border-r border-[#27272a] flex flex-col h-screen select-none shrink-0 transition-all duration-200 ease-in-out ${
-          // Mobile: slide drawer in/out
           isMobileSidebarOpen
             ? "translate-x-0 w-64 shadow-2xl"
             : "-translate-x-full md:translate-x-0"
         } ${
-          // Desktop: collapse to 0 width or show 256px
           isDesktopSidebarCollapsed
             ? "md:w-0 md:border-r-0 md:overflow-hidden md:opacity-0 md:pointer-events-none"
             : "md:w-64 md:opacity-100"
@@ -106,7 +105,6 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
           </Link>
 
           <div className="flex items-center gap-1">
-            {/* Desktop Collapse Button */}
             <button
               onClick={() => dispatch(toggleDesktopSidebar())}
               className="hidden md:flex text-zinc-500 hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
@@ -115,7 +113,6 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
               <PanelLeftClose className="w-4 h-4" />
             </button>
 
-            {/* Mobile Close Button */}
             <button
               onClick={() => dispatch(closeMobileSidebar())}
               className="md:hidden text-zinc-400 hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
@@ -134,7 +131,12 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
               Overview
             </p>
             <nav className="space-y-0.5">
-              <NavLink to="/" end onClick={handleNavClick} className={navLinkClass}>
+              <NavLink
+                to="/"
+                end
+                onClick={handleNavClick}
+                className={navLinkClass}
+              >
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
               </NavLink>
@@ -174,11 +176,11 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
             </nav>
           </div>
 
-          {/* --- PROJECTS --- */}
+          {/* --- WORKSPACE --- */}
           <div>
             <div className="flex items-center justify-between px-2 mb-1.5">
               <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
-                Projects
+                Workspace
               </p>
               {onOpenCreateProject && (
                 <button
@@ -194,10 +196,26 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
               )}
             </div>
             <nav className="space-y-0.5">
-              <NavLink to="/" end onClick={handleNavClick} className={navLinkClass}>
+              <NavLink
+                to="/"
+                end
+                onClick={handleNavClick}
+                className={navLinkClass}
+              >
                 <FolderKanban className="w-4 h-4" />
                 All Projects
               </NavLink>
+
+              {/* Naya Team Members Link */}
+              <NavLink
+                to="/members"
+                onClick={handleNavClick}
+                className={navLinkClass}
+              >
+                <Users className="w-4 h-4" />
+                <span>Team Members</span>
+              </NavLink>
+
               <button
                 onClick={() => {
                   handleNavClick();
