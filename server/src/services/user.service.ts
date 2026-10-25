@@ -57,6 +57,11 @@ export class UserService {
       ]);
     }
 
+    const organization = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { ownerId: true },
+    });
+
     const orgMemberships = await prisma.userOrganizationMembership.findMany({
       where: {
         organizationId: orgId,
@@ -120,11 +125,13 @@ export class UserService {
             role: pm.role,
           }));
 
+        const isOwner = organization?.ownerId === u.id;
         return {
           id: u.id,
           name: u.name,
           email: u.email,
-          role: om.role,
+          role: isOwner ? Role.ADMIN : om.role,
+          isOwner,
           createdAt: om.joinedAt.toISOString(),
           totalTasks: isAdmin ? u._count.assignedTasks : null,
           totalProjects: isAdmin ? u._count.projectMembers : null,
@@ -150,6 +157,18 @@ export class UserService {
 
     if (targetUserId === adminUser.id) {
       throw new ApiError(400, "You cannot modify your own administrator role");
+    }
+
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { ownerId: true },
+    });
+
+    if (org?.ownerId === targetUserId) {
+      throw new ApiError(
+        400,
+        "The organization owner's role cannot be modified. The creator always remains Admin.",
+      );
     }
 
     const membership = await prisma.userOrganizationMembership.findUnique({
