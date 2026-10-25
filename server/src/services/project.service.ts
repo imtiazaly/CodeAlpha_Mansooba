@@ -49,10 +49,15 @@ export class ProjectService {
               user: { select: { id: true, name: true, email: true } },
             },
           },
+          _count: {
+            select: {
+              members: true,
+              tasks: { where: { isDeleted: false } },
+            },
+          },
         },
       });
     }
-
     // Regular user sirf apne projects dekh sake (Owner ya Member)
     return prisma.project.findMany({
       where: {
@@ -63,6 +68,12 @@ export class ProjectService {
         owner: { select: { id: true, name: true, email: true } },
         members: {
           include: { user: { select: { id: true, name: true, email: true } } },
+        },
+        _count: {
+          select: {
+            members: true,
+            tasks: { where: { isDeleted: false } },
+          },
         },
       },
     });
