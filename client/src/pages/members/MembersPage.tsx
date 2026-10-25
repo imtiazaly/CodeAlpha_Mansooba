@@ -20,6 +20,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+interface MemberProject {
+  id: string;
+  name: string;
+  role: string;
+}
+
 interface MemberItem {
   id: string;
   name: string;
@@ -28,7 +34,7 @@ interface MemberItem {
   createdAt: string;
   totalTasks: number | null;
   totalProjects: number | null;
-  projects: { id: string; name: string; role: string }[];
+  projects: MemberProject[];
 }
 
 export const MembersPage = () => {
@@ -38,6 +44,9 @@ export const MembersPage = () => {
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "ALL">("ALL");
+  const [activeProjectPopover, setActiveProjectPopover] = useState<
+    string | null
+  >(null);
 
   // Invite modal state (Admin only)
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -103,7 +112,7 @@ export const MembersPage = () => {
         title={isAdmin ? "Team Directory" : "Project Teammates"}
         subtitle={
           isAdmin
-            ? "Manage organization members, roles, and project allocations"
+            ? "Manage organization members, system roles, and project allocations"
             : "Colleagues collaborating with you across shared projects"
         }
         actions={
@@ -120,7 +129,7 @@ export const MembersPage = () => {
       />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-        {/* ── Top Stats Cards ── */}
+        {/* ── Top Summary Stats ── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div className="bg-[#121214] border border-[#27272a] rounded-xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
@@ -181,11 +190,9 @@ export const MembersPage = () => {
                   <Shield className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-zinc-100">
-                    Confidential
-                  </p>
+                  <p className="text-xl font-bold text-zinc-100">Protected</p>
                   <p className="text-[11px] text-zinc-500">
-                    Role-Isolated Workspace
+                    Privacy-Scoped View
                   </p>
                 </div>
               </div>
@@ -193,7 +200,7 @@ export const MembersPage = () => {
           )}
         </div>
 
-        {/* ── Search & Filter Controls ── */}
+        {/* ── Search & Filter Bar ── */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#121214] border border-[#27272a] p-3 rounded-xl">
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-2.5" />
@@ -220,9 +227,9 @@ export const MembersPage = () => {
           </div>
         </div>
 
-        {/* ── Members Grid ── */}
+        {/* ── Members Table ── */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-16 text-xs text-zinc-500">
+          <div className="flex items-center justify-center py-20 text-xs text-zinc-500">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             Loading organization directory...
           </div>
@@ -234,92 +241,179 @@ export const MembersPage = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map((m) => (
-              <div
-                key={m.id}
-                className="bg-[#121214] border border-[#27272a] hover:border-zinc-700 rounded-xl p-4 flex flex-col justify-between transition-all duration-150"
-              >
-                <div>
-                  {/* Top: Avatar, Name, Email & Role */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-sm font-semibold text-indigo-300 shrink-0">
-                        {m.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-zinc-100 truncate">
-                          {m.name}
-                        </p>
-                        <p className="text-[11px] text-zinc-500 truncate flex items-center gap-1">
-                          <Mail className="w-3 h-3 shrink-0" />
-                          <span>{m.email}</span>
-                        </p>
-                      </div>
-                    </div>
+          <div className="bg-[#121214] border border-[#27272a] rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-zinc-300 border-collapse min-w-[760px]">
+                <thead>
+                  <tr className="bg-[#18181b]/70 border-b border-[#27272a] text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                    <th className="py-3 px-4">Member</th>
+                    <th className="py-3 px-4 w-32">System Role</th>
+                    <th className="py-3 px-4">
+                      {isAdmin ? "Assigned Projects" : "Shared Projects"}
+                    </th>
+                    {isAdmin && <th className="py-3 px-4 w-36">Workload</th>}
+                    <th className="py-3 px-4 w-36">Joined Date</th>
+                  </tr>
+                </thead>
 
-                    <span
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full border shrink-0 ${
-                        m.role === "ADMIN"
-                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                          : "bg-zinc-800 text-zinc-400 border-zinc-700"
-                      }`}
-                    >
-                      {m.role}
-                    </span>
-                  </div>
+                <tbody className="divide-y divide-[#27272a]/60">
+                  {filtered.map((m) => {
+                    const isPopoverOpen = activeProjectPopover === m.id;
+                    const visiblePills = m.projects.slice(0, 2);
+                    const remainingCount = m.projects.length - 2;
 
-                  {/* Projects Section */}
-                  <div className="mt-3 pt-3 border-t border-[#27272a]">
-                    <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">
-                      {isAdmin
-                        ? `Projects (${m.projects.length})`
-                        : `Shared Projects (${m.projects.length})`}
-                    </p>
-                    {m.projects.length === 0 ? (
-                      <p className="text-[11px] text-zinc-600 italic">
-                        No shared projects
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
-                        {m.projects.map((p) => (
+                    return (
+                      <tr
+                        key={m.id}
+                        className="hover:bg-zinc-900/40 transition-colors"
+                      >
+                        {/* 1. Member Info (Avatar, Name, Email) */}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-xs font-semibold text-indigo-300 shrink-0">
+                              {m.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-zinc-100 truncate">
+                                {m.name}
+                              </p>
+                              <p className="text-[11px] text-zinc-500 truncate flex items-center gap-1 mt-0.5">
+                                <Mail className="w-3 h-3 shrink-0 text-zinc-600" />
+                                <span>{m.email}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. System Role Badge */}
+                        <td className="py-3 px-4 whitespace-nowrap">
                           <span
-                            key={p.id}
-                            className="text-[10px] bg-[#18181b] border border-[#27272a] text-zinc-300 px-2 py-0.5 rounded"
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${
+                              m.role === "ADMIN"
+                                ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                : "bg-zinc-800/80 text-zinc-300 border-zinc-700/60"
+                            }`}
                           >
-                            {p.name}
+                            {m.role === "ADMIN" ? "ADMIN" : "MEMBER"}
                           </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                        </td>
 
-                {/* Footer: Admin ko task count dikhega, regular user ko sirf joined date */}
-                <div className="flex items-center justify-between pt-3 mt-4 border-t border-[#27272a] text-[11px] text-zinc-500">
-                  {isAdmin && m.totalTasks !== null ? (
-                    <span className="flex items-center gap-1 text-zinc-400">
-                      <CheckSquare className="w-3.5 h-3.5" />
-                      <span>{m.totalTasks} tasks assigned</span>
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-zinc-500">
-                      Collaborator
-                    </span>
-                  )}
+                        {/* 3. Projects (Pills with +N More Popover) */}
+                        <td className="py-3 px-4 relative">
+                          {m.projects.length === 0 ? (
+                            <span className="text-zinc-600 text-[11px] italic">
+                              No mutual projects
+                            </span>
+                          ) : (
+                            <div className="flex items-center flex-wrap gap-1.5">
+                              {visiblePills.map((p) => (
+                                <span
+                                  key={p.id}
+                                  className="inline-flex items-center text-[10px] bg-[#18181b] border border-[#27272a] text-zinc-300 px-2 py-0.5 rounded max-w-[150px] truncate"
+                                  title={`${p.name} (${p.role})`}
+                                >
+                                  {p.name}
+                                </span>
+                              ))}
 
-                  <span className="flex items-center gap-1 font-mono text-[10px]">
-                    <Calendar className="w-3 h-3 text-zinc-500" />
-                    <span>
-                      {new Date(m.createdAt).toLocaleDateString("en-GB", {
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </span>
-                  </span>
-                </div>
-              </div>
-            ))}
+                              {remainingCount > 0 && (
+                                <div className="relative inline-block">
+                                  <button
+                                    onClick={() =>
+                                      setActiveProjectPopover(
+                                        isPopoverOpen ? null : m.id,
+                                      )
+                                    }
+                                    className="text-[10px] bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded font-mono transition-colors cursor-pointer"
+                                  >
+                                    +{remainingCount} more
+                                  </button>
+
+                                  {/* Popover List */}
+                                  {isPopoverOpen && (
+                                    <>
+                                      <div
+                                        onClick={() =>
+                                          setActiveProjectPopover(null)
+                                        }
+                                        className="fixed inset-0 z-40"
+                                      />
+                                      <div className="absolute left-0 top-7 z-50 w-64 bg-[#18181b] border border-[#27272a] rounded-xl shadow-xl p-3 animate-in fade-in zoom-in-95 duration-150">
+                                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#27272a]">
+                                          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                                            {isAdmin
+                                              ? "All Assigned Projects"
+                                              : "Shared Projects"}
+                                          </p>
+                                          <button
+                                            onClick={() =>
+                                              setActiveProjectPopover(null)
+                                            }
+                                            className="text-zinc-500 hover:text-zinc-300"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                          {m.projects.map((p) => (
+                                            <div
+                                              key={p.id}
+                                              className="flex items-center justify-between text-xs py-1 px-1.5 rounded hover:bg-zinc-800/50"
+                                            >
+                                              <span className="text-zinc-200 truncate pr-2">
+                                                {p.name}
+                                              </span>
+                                              <span className="text-[9px] font-mono px-1.5 py-0.2 bg-zinc-900 border border-zinc-700/60 text-zinc-400 rounded shrink-0">
+                                                {p.role}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* 4. Workload / Tasks (Admin Only) */}
+                        {isAdmin && (
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {m.totalTasks !== null ? (
+                              <span className="flex items-center gap-1.5 text-zinc-300 font-mono text-[11px]">
+                                <CheckSquare className="w-3.5 h-3.5 text-indigo-400" />
+                                <span>{m.totalTasks} active tasks</span>
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600">-</span>
+                            )}
+                          </td>
+                        )}
+
+                        {/* 5. Joined Date */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="flex items-center gap-1.5 text-zinc-400 text-[11px] font-mono">
+                            <Calendar className="w-3 h-3 text-zinc-600" />
+                            <span>
+                              {new Date(m.createdAt).toLocaleDateString(
+                                "en-GB",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
