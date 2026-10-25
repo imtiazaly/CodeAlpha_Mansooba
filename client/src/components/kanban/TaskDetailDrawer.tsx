@@ -144,7 +144,7 @@ export const TaskDetailDrawer = ({
       <div className="flex-1" onClick={onClose} />
 
       {/* Drawer Container */}
-      <div className="w-full max-w-lg bg-[#121214] border-l border-[#27272a] h-full flex flex-col shadow-2xl relative select-none animate-in slide-in-from-right duration-200">
+      <div className="w-full sm:max-w-lg bg-[#121214] border-l border-[#27272a] h-full flex flex-col shadow-2xl relative select-none animate-in slide-in-from-right duration-200">
         {/* Header */}
         <div className="p-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export const TaskDetailDrawer = ({
           </div>
 
           {/* Properties Grid */}
-          <div className="grid grid-cols-2 gap-4 bg-[#18181b] p-3.5 rounded-xl border border-[#27272a] text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-[#18181b] p-3 sm:p-3.5 rounded-xl border border-[#27272a] text-xs">
             {/* Status */}
             <div>
               <span className="text-zinc-500 block mb-1">Status</span>

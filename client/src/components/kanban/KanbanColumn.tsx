@@ -56,7 +56,7 @@ export const KanbanColumn = ({
   };
 
   return (
-    <div className="w-80 shrink-0 flex flex-col bg-[#121214] border border-[#27272a] rounded-xl max-h-full overflow-hidden select-none">
+    <div className="w-full flex-1 flex flex-col bg-[#121214] border border-[#27272a] rounded-xl max-h-full overflow-hidden select-none">
       {/* Column Header */}
       <div className="p-3 border-b border-[#27272a] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
@@ -77,7 +77,6 @@ export const KanbanColumn = ({
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
-
       {/* Droppable Task List */}
       <Droppable droppableId={status}>
         {(provided, snapshot) => (
@@ -100,7 +99,6 @@ export const KanbanColumn = ({
           </div>
         )}
       </Droppable>
-
       {/* Quick Add Task Form / Button */}
       <div className="p-2 border-t border-[#27272a] shrink-0 bg-[#121214]">
         {isCreating ? (

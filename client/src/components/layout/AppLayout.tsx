@@ -8,13 +8,15 @@ export const AppLayout = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#09090b]">
-      {/* Left Sidebar */}
+      {/* Sidebar: manages its responsive mobile/desktop state via Redux */}
       <Sidebar onOpenCreateProject={() => setIsCreateProjectOpen(true)} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Outlet
-          context={{ openCreateProject: () => setIsCreateProjectOpen(true) }}
+          context={{
+            openCreateProject: () => setIsCreateProjectOpen(true),
+          }}
         />
       </div>
 

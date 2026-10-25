@@ -199,33 +199,82 @@ export const ProjectDetail = () => {
         actions={
           <button
             onClick={() => setIsMembersModalOpen(true)}
-            className="flex items-center gap-1.5 bg-[#18181b] hover:bg-zinc-800 border border-[#27272a] text-zinc-200 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 bg-[#18181b] hover:bg-zinc-800 border border-[#27272a] text-zinc-200 text-xs font-medium px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
+            title="Project Members"
           >
             <Users className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Members ({project.members?.length || 1})</span>
+            <span className="hidden sm:inline">Members</span>
+            <span className="text-[10px] text-zinc-400 font-mono">
+              ({project.members?.length || 1})
+            </span>
           </button>
         }
       />
 
-      {/* Kanban Board Canvas */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
+      {/* Mobile Column Tabs (Mobile par columns switch karne ke liye) */}
+      <div className="lg:hidden flex items-center gap-1.5 px-3 py-2 border-b border-[#27272a] bg-[#0c0c0e] overflow-x-auto no-scrollbar shrink-0">
+        <button
+          onClick={() => {
+            const el = document.getElementById("kanban-board-scroll");
+            el?.scrollTo({ left: 0, behavior: "smooth" });
+          }}
+          className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-zinc-800 text-zinc-200 shrink-0"
+        >
+          All ({tasks.length})
+        </button>
+        {COLUMNS.map((col) => {
+          const count = tasks.filter((t) => t.status === col.status).length;
+          return (
+            <button
+              key={col.status}
+              onClick={() => {
+                const el = document.getElementById(`col-card-${col.status}`);
+                el?.scrollIntoView({
+                  behavior: "smooth",
+                  inline: "center",
+                  block: "nearest",
+                });
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#18181b] border border-[#27272a] text-zinc-400 hover:text-zinc-200 shrink-0 cursor-pointer"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${col.colorDot}`} />
+              <span>{col.title}</span>
+              <span className="text-[10px] text-zinc-500 font-mono">
+                ({count})
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Kanban Board: Desktop par AUTO-FIT (No scrollbar), Mobile par smooth horizontal scroll */}
+      <div
+        id="kanban-board-scroll"
+        className="flex-1 overflow-x-auto lg:overflow-x-hidden overflow-y-hidden p-3 lg:p-5"
+      >
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex items-start gap-4 h-full">
+          {/* lg:w-full aur flex-nowrap se desktop par scrollbar khatam ho jata hai */}
+          <div className="flex items-start gap-3 lg:gap-3.5 h-full w-full min-w-fit lg:min-w-0">
             {COLUMNS.map((col) => {
               const columnTasks = tasks
                 .filter((task) => task.status === col.status)
                 .sort((a, b) => a.order - b.order);
 
               return (
-                <KanbanColumn
+                <div
                   key={col.status}
-                  status={col.status}
-                  title={col.title}
-                  colorDot={col.colorDot}
-                  tasks={columnTasks}
-                  projectId={project.id}
-                  onTaskClick={(task) => setSelectedTask(task)}
-                />
+                  id={`col-card-${col.status}`}
+                  className="h-full w-[85vw] sm:w-[320px] lg:w-auto lg:flex-1 lg:min-w-0 shrink-0 lg:shrink flex flex-col"
+                >
+                  <KanbanColumn
+                    status={col.status}
+                    title={col.title}
+                    colorDot={col.colorDot}
+                    tasks={columnTasks}
+                    projectId={project.id}
+                    onTaskClick={(task) => setSelectedTask(task)}
+                  />
+                </div>
               );
             })}
           </div>

@@ -1,12 +1,23 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Search, Command } from "lucide-react";
+import {
+  Bell,
+  Search,
+  Command,
+  Menu,
+  PanelLeft,
+} from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "../../api/axios";
 import { getSocket } from "../../lib/socket";
 import { NotificationsPopover } from "../notifications/NotificationsPopover";
 import type { Notification } from "../../types";
 import { SearchDialog } from "./SearchDialog";
+import { useAppDispatch, useAppSelector } from "../../store";
+import {
+  toggleMobileSidebar,
+  toggleDesktopSidebar,
+} from "../../store/slices/uiSlice";
 
 interface HeaderProps {
   title?: string;
@@ -22,6 +33,9 @@ export const Header = ({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  const dispatch = useAppDispatch();
+  const { isDesktopSidebarCollapsed } = useAppSelector((state) => state.ui);
 
   // 1. Fetch User Notifications
   const { data: notifications = [] } = useQuery({
@@ -73,15 +87,35 @@ export const Header = ({
   ).length;
 
   return (
-    <header className="h-14 bg-[#0c0c0e] border-b border-[#27272a] px-6 flex items-center justify-between shrink-0 relative">
-      {/* Title / Breadcrumbs */}
-      <div className="flex items-center gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">
+    <header className="h-14 bg-[#0c0c0e] border-b border-[#27272a] px-3 sm:px-6 flex items-center justify-between shrink-0 relative">
+      {/* Left side: Sidebar Toggles (Mobile & Desktop) + Title */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {/* Mobile Hamburger Button */}
+        <button
+          onClick={() => dispatch(toggleMobileSidebar())}
+          className="md:hidden p-1.5 -ml-1 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer shrink-0"
+          title="Open menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Desktop Sidebar Expand Button (visible only when desktop sidebar is collapsed) */}
+        {isDesktopSidebarCollapsed && (
+          <button
+            onClick={() => dispatch(toggleDesktopSidebar())}
+            className="hidden md:flex p-1.5 -ml-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer shrink-0"
+            title="Expand sidebar"
+          >
+            <PanelLeft className="w-4 h-4 text-indigo-400" />
+          </button>
+        )}
+
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-zinc-100 tracking-tight truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs md:max-w-md">
             {title}
           </h2>
           {subtitle && (
-            <p className="text-[11px] text-zinc-500 leading-none mt-0.5">
+            <p className="text-[11px] text-zinc-500 leading-none mt-0.5 truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs">
               {subtitle}
             </p>
           )}
@@ -89,7 +123,7 @@ export const Header = ({
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Actions slot */}
         {actions}
 
@@ -127,6 +161,7 @@ export const Header = ({
         notifications={notifications}
       />
 
+      {/* Global Search Dialog */}
       <SearchDialog
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
