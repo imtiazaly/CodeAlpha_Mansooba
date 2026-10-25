@@ -8,33 +8,54 @@ interface TaskCardProps {
   onClick: (task: Task) => void;
 }
 
+// Priority-based subtle background, border & pill styling
 const priorityConfig: Record<
   Priority,
-  { label: string; bg: string; text: string; border: string }
+  {
+    label: string;
+    bg: string;
+    text: string;
+    border: string;
+    cardBg: string;
+    cardBorder: string;
+    hoverBorder: string;
+  }
 > = {
   URGENT: {
     label: "Urgent",
-    bg: "bg-rose-500/10",
+    bg: "bg-rose-500/15",
     text: "text-rose-400",
-    border: "border-rose-500/20",
+    border: "border-rose-500/30",
+    cardBg: "bg-gradient-to-b from-[#1c1013] to-[#160d0f]",
+    cardBorder: "border-rose-900/40",
+    hoverBorder: "hover:border-rose-700/60",
   },
   HIGH: {
     label: "High",
-    bg: "bg-amber-500/10",
-    text: "text-amber-400",
-    border: "border-amber-500/20",
+    bg: "bg-orange-500/15",
+    text: "text-orange-400",
+    border: "border-orange-500/30",
+    cardBg: "bg-gradient-to-b from-[#1a120c] to-[#140e0a]",
+    cardBorder: "border-orange-900/40",
+    hoverBorder: "hover:border-orange-700/60",
   },
   MEDIUM: {
     label: "Med",
-    bg: "bg-blue-500/10",
-    text: "text-blue-400",
-    border: "border-blue-500/20",
+    bg: "bg-amber-500/15",
+    text: "text-amber-400",
+    border: "border-amber-500/30",
+    cardBg: "bg-gradient-to-b from-[#17140e] to-[#12100b]",
+    cardBorder: "border-amber-900/35",
+    hoverBorder: "hover:border-amber-700/50",
   },
   LOW: {
     label: "Low",
-    bg: "bg-zinc-800",
+    bg: "bg-zinc-800/80",
     text: "text-zinc-400",
-    border: "border-zinc-700",
+    border: "border-zinc-700/60",
+    cardBg: "bg-[#141416]",
+    cardBorder: "border-[#27272a]",
+    hoverBorder: "hover:border-zinc-600",
   },
 };
 
@@ -55,10 +76,10 @@ export const TaskCard = ({ task, index, onClick }: TaskCardProps) => {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={() => onClick(task)}
-          className={`group bg-[#18181b] border rounded-lg p-3 select-none transition-all cursor-pointer ${
+          className={`group border rounded-lg p-3 select-none transition-all cursor-pointer ${
             snapshot.isDragging
-              ? "border-indigo-500 shadow-xl shadow-black/50 rotate-1 bg-[#202024]"
-              : "border-[#27272a] hover:border-zinc-600 hover:bg-[#1c1c20]"
+              ? "border-indigo-500 shadow-xl shadow-black/70 rotate-1 bg-[#202025]"
+              : `${priority.cardBg} ${priority.cardBorder} ${priority.hoverBorder} hover:brightness-110`
           }`}
         >
           {/* Top Row: Priority Badge & Due Date */}
@@ -90,7 +111,7 @@ export const TaskCard = ({ task, index, onClick }: TaskCardProps) => {
           )}
 
           {/* Footer: Comments Count & Assignee Avatar */}
-          <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[#27272a]/80 text-[11px] text-zinc-500">
+          <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-white/5 text-[11px] text-zinc-500">
             <div className="flex items-center gap-1">
               {(task._count?.comments || 0) > 0 ? (
                 <span className="flex items-center gap-1 text-zinc-400 hover:text-zinc-300">

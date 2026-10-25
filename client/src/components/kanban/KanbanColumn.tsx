@@ -16,6 +16,52 @@ interface KanbanColumnProps {
   onTaskClick: (task: Task) => void;
 }
 
+// Status-based subtle background and border styling
+const statusStyles: Record<
+  TaskStatus,
+  {
+    columnBg: string;
+    border: string;
+    headerBorder: string;
+    footerBg: string;
+    dragOverBg: string;
+    badgeBg: string;
+  }
+> = {
+  TODO: {
+    columnBg: "bg-[#0e1014]/90",
+    border: "border-slate-800/80",
+    headerBorder: "border-slate-800/60",
+    footerBg: "bg-[#0e1014]",
+    dragOverBg: "bg-slate-900/50",
+    badgeBg: "bg-slate-800/80 text-slate-300 border-slate-700/60",
+  },
+  IN_PROGRESS: {
+    columnBg: "bg-[#14110b]/90",
+    border: "border-amber-900/40",
+    headerBorder: "border-amber-900/30",
+    footerBg: "bg-[#14110b]",
+    dragOverBg: "bg-amber-950/40",
+    badgeBg: "bg-amber-950/60 text-amber-300 border-amber-800/40",
+  },
+  DONE: {
+    columnBg: "bg-[#0c130f]/90",
+    border: "border-emerald-900/40",
+    headerBorder: "border-emerald-900/30",
+    footerBg: "bg-[#0c130f]",
+    dragOverBg: "bg-emerald-950/40",
+    badgeBg: "bg-emerald-950/60 text-emerald-300 border-emerald-800/40",
+  },
+  CANCELLED: {
+    columnBg: "bg-[#140d10]/90",
+    border: "border-rose-900/40",
+    headerBorder: "border-rose-900/30",
+    footerBg: "bg-[#140d10]",
+    dragOverBg: "bg-rose-950/40",
+    badgeBg: "bg-rose-950/60 text-rose-300 border-rose-800/40",
+  },
+};
+
 export const KanbanColumn = ({
   status,
   title,
@@ -29,6 +75,7 @@ export const KanbanColumn = ({
   const [isLoading, setIsLoading] = useState(false);
 
   const queryClient = useQueryClient();
+  const theme = statusStyles[status] || statusStyles.TODO;
 
   const handleQuickCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,27 +103,34 @@ export const KanbanColumn = ({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-[#121214] border border-[#27272a] rounded-xl max-h-full overflow-hidden select-none">
+    <div
+      className={`w-full flex-1 flex flex-col ${theme.columnBg} ${theme.border} border rounded-xl max-h-full overflow-hidden select-none transition-colors shadow-xs`}
+    >
       {/* Column Header */}
-      <div className="p-3 border-b border-[#27272a] flex items-center justify-between shrink-0">
+      <div
+        className={`p-3 border-b ${theme.headerBorder} flex items-center justify-between shrink-0`}
+      >
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${colorDot}`} />
           <h3 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
             {title}
           </h3>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
+          <span
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full border ${theme.badgeBg}`}
+          >
             {tasks.length}
           </span>
         </div>
 
         <button
           onClick={() => setIsCreating(true)}
-          className="text-zinc-500 hover:text-zinc-200 p-1 rounded hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="text-zinc-500 hover:text-zinc-200 p-1 rounded hover:bg-white/5 transition-colors cursor-pointer"
           title="Add task to this column"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
+
       {/* Droppable Task List */}
       <Droppable droppableId={status}>
         {(provided, snapshot) => (
@@ -84,7 +138,7 @@ export const KanbanColumn = ({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`flex-1 p-2.5 overflow-y-auto space-y-2.5 min-h-37.5 transition-colors ${
-              snapshot.isDraggingOver ? "bg-zinc-900/40" : ""
+              snapshot.isDraggingOver ? theme.dragOverBg : ""
             }`}
           >
             {tasks.map((task, index) => (
@@ -99,8 +153,9 @@ export const KanbanColumn = ({
           </div>
         )}
       </Droppable>
+
       {/* Quick Add Task Form / Button */}
-      <div className="p-2 border-t border-[#27272a] shrink-0 bg-[#121214]">
+      <div className={`p-2 border-t ${theme.headerBorder} shrink-0 ${theme.footerBg}`}>
         {isCreating ? (
           <form onSubmit={handleQuickCreate} className="space-y-2">
             <input
@@ -118,7 +173,7 @@ export const KanbanColumn = ({
                   setIsCreating(false);
                   setNewTitle("");
                 }}
-                className="text-zinc-400 hover:text-zinc-200 p-1 rounded text-xs hover:bg-zinc-800 cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-200 p-1 rounded text-xs hover:bg-white/5 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -138,7 +193,7 @@ export const KanbanColumn = ({
         ) : (
           <button
             onClick={() => setIsCreating(true)}
-            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors cursor-pointer"
+            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add task</span>
