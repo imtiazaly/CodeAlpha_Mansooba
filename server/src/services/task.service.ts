@@ -11,6 +11,7 @@ interface CurrentUser {
   id: string;
   email: string;
   role: Role;
+  organizationId?: string | null;
 }
 
 interface CreateTaskInput {
@@ -49,10 +50,7 @@ export class TaskService {
     }
     const membership = await prisma.projectMember.findUnique({
       where: {
-        projectId_userId: {
-          projectId,
-          userId: assigneeId,
-        },
+        projectId_userId: { projectId, userId: assigneeId },
       },
     });
     if (!membership) {
@@ -134,6 +132,7 @@ export class TaskService {
       isDeleted: false,
       project: {
         isDeleted: false,
+        ...(user.organizationId && { organizationId: user.organizationId }),
         ...(user.role !== Role.ADMIN && {
           members: { some: { userId: user.id } },
         }),
@@ -190,14 +189,19 @@ export class TaskService {
       where: {
         id,
         isDeleted: false,
-        project: { isDeleted: false },
+        project: {
+          isDeleted: false,
+          ...(user.organizationId && { organizationId: user.organizationId }),
+        },
       },
       include: {
         creator: { select: { id: true, name: true, email: true } },
         assignee: { select: { id: true, name: true, email: true } },
         project: { select: { id: true, name: true, isDeleted: true } },
         comments: {
-          include: { user: { select: { id: true, name: true, email: true } } },
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
           orderBy: { createdAt: "asc" },
         },
       },
@@ -246,7 +250,7 @@ export class TaskService {
 
     emitToProject(task.projectId, "task:updated", updatedTask);
 
-    // CASE 3: Notification when Task is re-assigned to a new person
+    // CASE 3: New assignee notification
     if (
       updatedTask.assigneeId &&
       updatedTask.assigneeId !== task.assigneeId &&
@@ -262,7 +266,7 @@ export class TaskService {
       });
     }
 
-    // CASE 5: Notification when Task is unassigned from previous assignee
+    // CASE 5: Unassign notification
     if (
       task.assigneeId &&
       data.assigneeId !== undefined &&
@@ -279,7 +283,7 @@ export class TaskService {
       });
     }
 
-    // CASE 4: Notification on Task Status or Priority Update
+    // CASE 4: Status / Priority update notification
     const isStatusChanged = data.status && data.status !== task.status;
     const isPriorityChanged = data.priority && data.priority !== task.priority;
 

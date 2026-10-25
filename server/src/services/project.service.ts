@@ -9,6 +9,7 @@ interface CurrentUser {
   id: string;
   email: string;
   role: Role;
+  organizationId?: string | null;
 }
 
 export class ProjectService {
@@ -22,6 +23,7 @@ export class ProjectService {
           name: data.name,
           description: data.description,
           ownerId: user.id,
+          organizationId: user.organizationId || undefined,
         },
       });
 
@@ -38,9 +40,16 @@ export class ProjectService {
   }
 
   static async getProjects(user: CurrentUser) {
+    const orgFilter = user.organizationId
+      ? { organizationId: user.organizationId }
+      : {};
+
     if (user.role === Role.ADMIN) {
       return prisma.project.findMany({
-        where: { isDeleted: false },
+        where: {
+          isDeleted: false,
+          ...orgFilter,
+        },
         include: {
           owner: { select: { id: true, name: true, email: true } },
           members: {
@@ -58,15 +67,19 @@ export class ProjectService {
       });
     }
 
+    // Regular user: sirf apni org ke projects + member hona zaroori
     return prisma.project.findMany({
       where: {
         isDeleted: false,
+        ...orgFilter, // ← Org isolation for USER
         members: { some: { userId: user.id } },
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
         members: {
-          include: { user: { select: { id: true, name: true, email: true } } },
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
         },
         _count: {
           select: {
@@ -80,11 +93,17 @@ export class ProjectService {
 
   static async getProjectById(id: string, user: CurrentUser) {
     const project = await prisma.project.findFirst({
-      where: { id, isDeleted: false },
+      where: {
+        id,
+        isDeleted: false,
+        ...(user.organizationId && { organizationId: user.organizationId }),
+      },
       include: {
         owner: { select: { id: true, name: true, email: true } },
         members: {
-          include: { user: { select: { id: true, name: true, email: true } } },
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
         },
         tasks: { where: { isDeleted: false } },
       },
@@ -201,7 +220,6 @@ export class ProjectService {
       include: { user: { select: { id: true, name: true, email: true } } },
     });
 
-    // Real-Time Event
     emitToProject(projectId, "member:added", newMember);
 
     // CASE 1: Notification on Add to Project
@@ -243,7 +261,6 @@ export class ProjectService {
       where: { projectId_userId: { projectId, userId: targetUserId } },
     });
 
-    // Real-Time Event
     emitToProject(projectId, "member:removed", {
       projectId,
       userId: targetUserId,
