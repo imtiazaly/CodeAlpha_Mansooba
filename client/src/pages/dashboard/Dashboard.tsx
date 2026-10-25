@@ -5,8 +5,12 @@ import { Header } from "../../components/layout/Header";
 import { ProjectCard } from "../../components/projects/ProjectCard";
 import { apiClient } from "../../api/axios";
 import type { ApiResponse, Project } from "../../types";
+import { useState } from "react";
+import { EditProjectModal } from "../../components/projects/EditProjectModal";
 
 export const Dashboard = () => {
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+
   const { openCreateProject } = useOutletContext<{
     openCreateProject: () => void;
   }>();
@@ -39,7 +43,6 @@ export const Dashboard = () => {
           </button>
         }
       />
-
       {/* Main Body */}
       <div className="flex-1 overflow-y-auto p-6">
         {/* Loading Skeletons */}
@@ -103,12 +106,23 @@ export const Dashboard = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onEdit={(p) => setEditingProject(p)} // <-- yeh add karein
+                />
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {editingProject && (
+        <EditProjectModal
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
+        />
+      )}
     </div>
   );
 };
