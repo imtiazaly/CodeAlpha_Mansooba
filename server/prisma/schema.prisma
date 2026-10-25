@@ -33,6 +33,12 @@ enum Priority {
   URGENT
 }
 
+enum MembershipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 enum NotificationType {
   TASK_ASSIGNED
   TASK_STATUS_CHANGED
@@ -40,6 +46,7 @@ enum NotificationType {
   PROJECT_INVITATION
   PROJECT_REMOVED
   TASK_UNASSIGNED
+  WORKSPACE_INVITATION
 }
 
 model Organization {
@@ -193,16 +200,19 @@ model Notification {
 }
 
 model UserOrganizationMembership {
-  id             String       @id @default(uuid())
+  id             String           @id @default(uuid())
   userId         String
   organizationId String
-  joinedAt       DateTime     @default(now())
+  role           Role             @default(USER)
+  status         MembershipStatus @default(ACCEPTED)
+  joinedAt       DateTime         @default(now())
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
   @@index([userId])
   @@index([organizationId])
+  @@index([status])
   @@map("user_organization_memberships")
 }
