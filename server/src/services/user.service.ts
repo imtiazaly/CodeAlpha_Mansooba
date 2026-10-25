@@ -4,7 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import bcrypt from "bcryptjs";
 
 export class UserService {
-  // 1. Organization Members Directory (Tareeqa A: Shared/Protected Projects)
+  // 1. Organization Members Directory (Strict Project Co-worker Boundary)
   static async getOrganizationMembers(currentUser: { id: string; role: Role }) {
     // Current user ka organizationId check karein
     const me = await prisma.user.findUnique({
@@ -16,10 +16,55 @@ export class UserService {
       ? { organizationId: me.organizationId }
       : {};
 
+    // ── Regular USER logic: Sirf shared projects ke members dhoondein ──
+    let allowedUserIds: Set<string> | null = null;
+    let myProjectIds = new Set<string>();
+
+    if (currentUser.role !== Role.ADMIN) {
+      // 1. Current user kin kin projects mein Owner ya Member hai
+      const [memberships, ownedProjects] = await Promise.all([
+        prisma.projectMember.findMany({
+          where: { userId: currentUser.id },
+          select: { projectId: true },
+        }),
+        prisma.project.findMany({
+          where: { ownerId: currentUser.id, isDeleted: false },
+          select: { id: true },
+        }),
+      ]);
+
+      myProjectIds = new Set([
+        ...memberships.map((m) => m.projectId),
+        ...ownedProjects.map((p) => p.id),
+      ]);
+
+      // 2. Un projects ke tamam members aur owners ke IDs nikalein
+      const [coMembers, projectOwners] = await Promise.all([
+        prisma.projectMember.findMany({
+          where: { projectId: { in: Array.from(myProjectIds) } },
+          select: { userId: true },
+        }),
+        prisma.project.findMany({
+          where: { id: { in: Array.from(myProjectIds) } },
+          select: { ownerId: true },
+        }),
+      ]);
+
+      // Co-workers list (including self)
+      allowedUserIds = new Set<string>([
+        currentUser.id,
+        ...coMembers.map((cm) => cm.userId),
+        ...projectOwners.map((po) => po.ownerId),
+      ]);
+    }
+
+    // ── Fetch Users ──
     const users = await prisma.user.findMany({
       where: {
         isActive: true,
         ...whereOrg,
+        // Regular USER ko sirf allowed co-workers dikhein
+        ...(allowedUserIds ? { id: { in: Array.from(allowedUserIds) } } : {}),
       },
       select: {
         id: true,
@@ -49,18 +94,8 @@ export class UserService {
       orderBy: { createdAt: "asc" },
     });
 
-    // Tareeqa A Privacy: Regular USER ko sirf wahi projects show hon jisme woh khud bhi member hai
-    let myProjectIds = new Set<string>();
-    if (currentUser.role !== Role.ADMIN) {
-      const myMemberships = await prisma.projectMember.findMany({
-        where: { userId: currentUser.id },
-        select: { projectId: true },
-      });
-      myProjectIds = new Set(myMemberships.map((m) => m.projectId));
-    }
-
     return users.map((u) => {
-      // Filter projects based on privacy
+      // Filter projects: Regular user ko sirf wahi projects dikhein jo shared hon
       const visibleProjects = u.projectMembers
         .filter((pm) => !pm.project.isDeleted)
         .filter(
@@ -80,7 +115,7 @@ export class UserService {
         role: u.role,
         createdAt: u.createdAt,
         totalTasks: u._count.assignedTasks,
-        totalProjects: u._count.projectMembers,
+        totalProjects: visibleProjects.length,
         projects: visibleProjects,
       };
     });
