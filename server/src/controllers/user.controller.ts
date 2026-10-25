@@ -56,9 +56,10 @@ export class UserController {
       .json(new ApiResponse(201, newUser, "User invited successfully"));
   });
 
+  // FIX: parseInt ensures Prisma receives an integer, not a string
   static searchUsers = asyncHandler(async (req: Request, res: Response) => {
     const query = (req.query.q as string) || "";
-    const limit = (req.query.limit as unknown as number) || 10;
+    const limit = Math.max(1, parseInt(String(req.query.limit || 10), 10));
     const users = await UserService.searchUsers(query, req.user!.id, limit);
     res
       .status(200)

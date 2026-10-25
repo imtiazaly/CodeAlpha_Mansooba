@@ -134,7 +134,7 @@ export class UserService {
     });
   }
 
-  // 3. Change Password (Current password verify karke)
+  // 3. Change Password
   static async changePassword(
     userId: string,
     data: { currentPassword: string; newPassword: string },
@@ -155,7 +155,6 @@ export class UserService {
       throw new ApiError(401, "Current password is incorrect");
     }
 
-    // Same password check
     const isSame = await bcrypt.compare(data.newPassword, user.password);
     if (isSame) {
       throw new ApiError(
@@ -210,8 +209,7 @@ export class UserService {
     });
   }
 
-  // 5. Invite / Add Member (Only for Admin)
-  // 5. Invite User — Handles BOTH existing and new users
+  // 5. Invite User — Case-Insensitive Matching
   static async inviteUser(
     data: { name: string; email: string; role?: Role; password?: string },
     adminUser: { id: string; role: Role },
@@ -220,7 +218,6 @@ export class UserService {
       throw new ApiError(403, "Only admins can invite members");
     }
 
-    // Admin ki organization fetch karo
     const admin = await prisma.user.findUnique({
       where: { id: adminUser.id },
       select: {
@@ -233,9 +230,13 @@ export class UserService {
       throw new ApiError(400, "Admin does not belong to any organization");
     }
 
-    // ── CASE A: User already exists in the system ──
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+    const targetEmail = data.email.trim();
+
+    // Case-Insensitive matching so email casing doesn't break
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: { equals: targetEmail, mode: "insensitive" },
+      },
       select: {
         id: true,
         name: true,
@@ -246,7 +247,6 @@ export class UserService {
     });
 
     if (existingUser) {
-      // Check: kya ye user pehle se is org ka member hai?
       const alreadyMember = await prisma.userOrganizationMembership.findUnique({
         where: {
           userId_organizationId: {
@@ -263,7 +263,6 @@ export class UserService {
         );
       }
 
-      // Org membership create karo (active org change nahi hogi — user khud switch karega)
       await prisma.userOrganizationMembership.create({
         data: {
           userId: existingUser.id,
@@ -271,7 +270,6 @@ export class UserService {
         },
       });
 
-      // Notification bhejo
       await prisma.notification.create({
         data: {
           userId: existingUser.id,
@@ -287,7 +285,7 @@ export class UserService {
       };
     }
 
-    // ── CASE B: New user — create account + membership ──
+    // New user
     const defaultPassword = data.password || "Password123!";
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
@@ -295,7 +293,7 @@ export class UserService {
       const newUser = await tx.user.create({
         data: {
           name: data.name,
-          email: data.email,
+          email: targetEmail.toLowerCase(),
           password: hashedPassword,
           role: data.role || Role.USER,
           organizationId: admin.organizationId,
@@ -321,19 +319,19 @@ export class UserService {
     });
   }
 
-  // 6. Search users
+  // 6. Search users (Case-insensitive)
   static async searchUsers(
     query: string,
     currentUserId: string,
     limit: number,
   ) {
+    const trimmed = query.trim();
     return prisma.user.findMany({
       where: {
         isActive: true,
-        id: { not: currentUserId },
         OR: [
-          { email: { contains: query, mode: "insensitive" } },
-          { name: { contains: query, mode: "insensitive" } },
+          { email: { contains: trimmed, mode: "insensitive" } },
+          { name: { contains: trimmed, mode: "insensitive" } },
         ],
       },
       take: limit,

@@ -99,23 +99,27 @@ export const MembersPage = () => {
 
   // Email lookup (check if user already exists)
   const handleEmailLookup = async () => {
-    if (!inviteEmail.trim()) return;
+    const emailToSearch = inviteEmail.trim().toLowerCase();
+    if (!emailToSearch) return;
+
     setIsLookingUp(true);
     setFoundUser(null);
     setEmailChecked(false);
+
     try {
-      const res = await apiClient.get(
-        `/users/search?q=${encodeURIComponent(inviteEmail.trim())}&limit=1`,
+      const res = await apiClient.get<ApiResponse<any[]>>(
+        `/users/search?q=${encodeURIComponent(emailToSearch)}&limit=10`,
       );
       const results = res.data.data || [];
       const exact = results.find(
-        (u: any) => u.email.toLowerCase() === inviteEmail.trim().toLowerCase(),
+        (u: any) => u.email.toLowerCase() === emailToSearch,
       );
+
       if (exact) {
         setFoundUser(exact);
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error searching user");
     } finally {
       setIsLookingUp(false);
       setEmailChecked(true);
