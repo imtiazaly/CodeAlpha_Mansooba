@@ -151,9 +151,14 @@ export class TaskService {
           members: { some: { userId: user.id } },
         }),
       },
+      ...(user.role !== Role.ADMIN &&
+        !query.assigneeId && {
+          assigneeId: user.id,
+        }),
       ...(projectId && { projectId }),
       ...(status && { status }),
       ...(priority && { priority }),
+      ...(query.assigneeId && { assigneeId: query.assigneeId }),
       ...(search && {
         OR: [
           { title: { contains: search, mode: "insensitive" } },

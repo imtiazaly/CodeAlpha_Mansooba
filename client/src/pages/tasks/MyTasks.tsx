@@ -27,9 +27,7 @@ export const MyTasks = () => {
     queryFn: async () => {
       const res =
         await apiClient.get<ApiResponse<{ tasks: Task[] }>>(`/tasks?limit=100`);
-      return (res.data.data?.tasks || []).filter(
-        (t: Task) => t.assigneeId === user?.id,
-      );
+      return res.data.data?.tasks || [];
     },
     enabled: !!user?.id,
   });

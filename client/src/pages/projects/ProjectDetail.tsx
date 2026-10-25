@@ -102,10 +102,10 @@ export const ProjectDetail = () => {
   const { data: tasks = [], isLoading: isTasksLoading } = useQuery({
     queryKey: ["tasks", id],
     queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<Task[]>>(
+      const res = await apiClient.get<ApiResponse<{ tasks: Task[] }>>(
         `/tasks?projectId=${id}&limit=500`,
       );
-      return res.data.data;
+      return res.data.data?.tasks || [];
     },
     enabled: !!id,
   });
