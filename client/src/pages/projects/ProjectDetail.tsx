@@ -24,6 +24,7 @@ export const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [activeTab, setActiveTab] = useState<TaskStatus | "ALL">("TODO");
 
   const queryClient = useQueryClient();
 
@@ -211,51 +212,61 @@ export const ProjectDetail = () => {
         }
       />
 
-      {/* Mobile Column Tabs (Mobile par columns switch karne ke liye) */}
+      {/* ── Mobile / Tablet Column Selector (< 1024px) ── */}
       <div className="lg:hidden flex items-center gap-1.5 px-3 py-2 border-b border-[#27272a] bg-[#0c0c0e] overflow-x-auto no-scrollbar shrink-0">
-        <button
-          onClick={() => {
-            const el = document.getElementById("kanban-board-scroll");
-            el?.scrollTo({ left: 0, behavior: "smooth" });
-          }}
-          className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-zinc-800 text-zinc-200 shrink-0"
-        >
-          All ({tasks.length})
-        </button>
         {COLUMNS.map((col) => {
           const count = tasks.filter((t) => t.status === col.status).length;
+          const isActive = activeTab === col.status;
           return (
             <button
               key={col.status}
-              onClick={() => {
-                const el = document.getElementById(`col-card-${col.status}`);
-                el?.scrollIntoView({
-                  behavior: "smooth",
-                  inline: "center",
-                  block: "nearest",
-                });
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#18181b] border border-[#27272a] text-zinc-400 hover:text-zinc-200 shrink-0 cursor-pointer"
+              onClick={() => setActiveTab(col.status)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 cursor-pointer ${
+                isActive
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                  : "bg-[#18181b] border border-[#27272a] text-zinc-400 hover:text-zinc-200"
+              }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${col.colorDot}`} />
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-white" : col.colorDot}`}
+              />
               <span>{col.title}</span>
-              <span className="text-[10px] text-zinc-500 font-mono">
+              <span
+                className={`text-[10px] font-mono ${isActive ? "text-indigo-200" : "text-zinc-500"}`}
+              >
                 ({count})
               </span>
             </button>
           );
         })}
+
+        {/* View all columns option */}
+        <button
+          onClick={() => setActiveTab("ALL")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 cursor-pointer ${
+            activeTab === "ALL"
+              ? "bg-indigo-600 text-white"
+              : "bg-[#18181b] border border-[#27272a] text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          All Board
+        </button>
       </div>
 
-      {/* Kanban Board: Desktop par AUTO-FIT (No scrollbar), Mobile par smooth horizontal scroll */}
-      <div
-        id="kanban-board-scroll"
-        className="flex-1 overflow-x-auto lg:overflow-x-hidden overflow-y-hidden p-3 lg:p-5"
-      >
+      {/* ── Kanban Canvas ── */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-3 sm:p-5">
         <DragDropContext onDragEnd={handleDragEnd}>
-          {/* lg:w-full aur flex-nowrap se desktop par scrollbar khatam ho jata hai */}
-          <div className="flex items-start gap-3 lg:gap-3.5 h-full w-full min-w-fit lg:min-w-0">
+          <div
+            className={`flex items-start gap-3 lg:gap-4 h-full w-full ${
+              activeTab === "ALL"
+                ? "min-w-max lg:min-w-0"
+                : "max-w-2xl mx-auto lg:max-w-none"
+            }`}
+          >
             {COLUMNS.map((col) => {
+              // Mobile par sirf active tab dikhega (ya sab agar ALL ho). Desktop par hamesha sabhi dikhenge.
+              const isVisibleOnMobile =
+                activeTab === "ALL" || activeTab === col.status;
               const columnTasks = tasks
                 .filter((task) => task.status === col.status)
                 .sort((a, b) => a.order - b.order);
@@ -263,8 +274,13 @@ export const ProjectDetail = () => {
               return (
                 <div
                   key={col.status}
-                  id={`col-card-${col.status}`}
-                  className="h-full w-[85vw] sm:w-[320px] lg:w-auto lg:flex-1 lg:min-w-0 shrink-0 lg:shrink flex flex-col"
+                  className={`h-full flex flex-col ${
+                    isVisibleOnMobile ? "flex" : "hidden lg:flex"
+                  } ${
+                    activeTab === "ALL"
+                      ? "w-70 sm:w-[320px] lg:w-auto lg:flex-1 shrink-0 lg:shrink"
+                      : "w-full lg:w-auto lg:flex-1 shrink-0 lg:shrink"
+                  }`}
                 >
                   <KanbanColumn
                     status={col.status}

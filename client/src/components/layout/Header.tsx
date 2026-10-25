@@ -111,11 +111,11 @@ export const Header = ({
         )}
 
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-zinc-100 tracking-tight truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs md:max-w-md">
+          <h2 className="text-sm font-semibold text-zinc-100 tracking-tight truncate max-w-35 xs:max-w-[200px] sm:max-w-xs md:max-w-md">
             {title}
           </h2>
           {subtitle && (
-            <p className="text-[11px] text-zinc-500 leading-none mt-0.5 truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs">
+            <p className="text-[11px] text-zinc-500 leading-none mt-0.5 truncate max-w-35 xs:max-w-[200px] sm:max-w-xs">
               {subtitle}
             </p>
           )}
