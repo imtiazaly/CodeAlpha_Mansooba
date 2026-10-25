@@ -16,7 +16,6 @@ export class ProjectService {
     data: { name: string; description?: string },
     user: CurrentUser,
   ) {
-    // Project create karein aur user ko automatically OWNER banayein
     return prisma.$transaction(async (tx) => {
       const project = await tx.project.create({
         data: {
@@ -58,7 +57,7 @@ export class ProjectService {
         },
       });
     }
-    // Regular user sirf apne projects dekh sake (Owner ya Member)
+
     return prisma.project.findMany({
       where: {
         isDeleted: false,
@@ -153,7 +152,6 @@ export class ProjectService {
     role: ProjectRole,
     user: CurrentUser,
   ) {
-    // Project owner role cannot be assigned via addMember
     if (role === ProjectRole.OWNER) {
       throw new ApiError(
         400,
@@ -178,7 +176,6 @@ export class ProjectService {
       );
     }
 
-    // Role Escalation Check: Sirf Project Owner ya System Admin hi kisi ko ADMIN bana sakta hai
     if (role === ProjectRole.ADMIN && !isSystemAdmin && !isProjectOwner) {
       throw new ApiError(
         403,
@@ -204,10 +201,10 @@ export class ProjectService {
       include: { user: { select: { id: true, name: true, email: true } } },
     });
 
-    // Real-Time Event: Project members list update karein
+    // Real-Time Event
     emitToProject(projectId, "member:added", newMember);
 
-    // Notification: Added member ko notify karein
+    // CASE 1: Notification on Add to Project
     if (targetUserId !== user.id) {
       await NotificationService.createNotification({
         userId: targetUserId,
@@ -246,11 +243,22 @@ export class ProjectService {
       where: { projectId_userId: { projectId, userId: targetUserId } },
     });
 
-    // Real-Time Event: Member remove notification
+    // Real-Time Event
     emitToProject(projectId, "member:removed", {
       projectId,
       userId: targetUserId,
     });
+
+    // CASE 2: Notification on Remove from Project
+    if (targetUserId !== user.id) {
+      await NotificationService.createNotification({
+        userId: targetUserId,
+        type: NotificationType.PROJECT_REMOVED,
+        title: "Removed from Project",
+        message: `You were removed from project "${project.name}"`,
+        projectId: project.id,
+      });
+    }
 
     return { message: "Member successfully removed" };
   }

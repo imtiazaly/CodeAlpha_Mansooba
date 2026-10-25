@@ -18,7 +18,7 @@ interface CreateTaskInput {
   description?: string;
   status?: TaskStatus;
   priority?: Priority;
-  order?: number; // Added
+  order?: number;
   dueDate?: string;
   projectId: string;
   assigneeId?: string | null;
@@ -29,20 +29,9 @@ interface UpdateTaskInput {
   description?: string | null;
   status?: TaskStatus;
   priority?: Priority;
-  order?: number; // Added
+  order?: number;
   dueDate?: string | null;
   assigneeId?: string | null;
-}
-
-interface QueryTasksInput {
-  page: number;
-  limit: number;
-  projectId?: string;
-  status?: TaskStatus;
-  priority?: Priority;
-  search?: string;
-  sortBy: string;
-  sortOrder: "asc" | "desc";
 }
 
 export class TaskService {
@@ -50,7 +39,7 @@ export class TaskService {
     projectId: string,
     assigneeId?: string | null,
   ) {
-    if (!assigneeId) return; // Agar null/undefined hai (unassign karna) to allow hai
+    if (!assigneeId) return;
     const user = await prisma.user.findUnique({
       where: { id: assigneeId },
       select: { id: true, isActive: true },
@@ -72,13 +61,9 @@ export class TaskService {
   }
 
   static async createTask(data: CreateTaskInput, user: CurrentUser) {
-    // Check project access & role
     await assertProjectAccess(data.projectId, user, ProjectRole.MEMBER);
-
-    // Validate assignee (agar diya gaya hai)
     await this.validateAssignee(data.projectId, data.assigneeId);
 
-    // Agar order specify nahi kiya gaya to us column ka highest order + 1000 calculate karein
     let taskOrder = data.order;
     if (taskOrder === undefined) {
       const highestTask = await prisma.task.findFirst({
@@ -112,10 +97,9 @@ export class TaskService {
       },
     });
 
-    // Real-Time Event: Project members ko naye task ka notify karein
     emitToProject(task.projectId, "task:created", task);
 
-    // Notification: Agar task kisi doosre user ko assign kiya gaya hai
+    // CASE 3: Notification on Initial Task Assign
     if (task.assigneeId && task.assigneeId !== user.id) {
       await NotificationService.createNotification({
         userId: task.assigneeId,
@@ -132,7 +116,6 @@ export class TaskService {
 
   static async getTasks(query: any, user: CurrentUser) {
     const page = Math.max(1, parseInt(String(query.page || 1), 10));
-    
     const HARD_LIMIT = 500;
     const DEFAULT_LIMIT = 20;
     const limit = Math.max(
@@ -222,7 +205,6 @@ export class TaskService {
 
     if (!task) throw new ApiError(404, "Task not found");
 
-    // VIEWER bhi task read kar sakta hai
     await assertProjectAccess(task.projectId, user, ProjectRole.VIEWER);
 
     return task;
@@ -235,10 +217,8 @@ export class TaskService {
   ) {
     const task = await this.getTaskById(id, user);
 
-    // Edit permission check
     await assertProjectAccess(task.projectId, user, ProjectRole.MEMBER);
 
-    // Validate assignee if updated
     if (data.assigneeId !== undefined) {
       await this.validateAssignee(task.projectId, data.assigneeId);
     }
@@ -252,7 +232,7 @@ export class TaskService {
         }),
         ...(data.status !== undefined && { status: data.status }),
         ...(data.priority !== undefined && { priority: data.priority }),
-        ...(data.order !== undefined && { order: data.order }), // Added for Kanban Drag & Drop
+        ...(data.order !== undefined && { order: data.order }),
         ...(data.dueDate !== undefined && {
           dueDate: data.dueDate ? new Date(data.dueDate) : null,
         }),
@@ -264,10 +244,9 @@ export class TaskService {
       },
     });
 
-    // Real-Time Event: Drag-and-drop ya task update live sync karein
     emitToProject(task.projectId, "task:updated", updatedTask);
 
-    // Notification 1: Agar task kisi naye user ko assign hua hai
+    // CASE 3: Notification when Task is re-assigned to a new person
     if (
       updatedTask.assigneeId &&
       updatedTask.assigneeId !== task.assigneeId &&
@@ -283,20 +262,46 @@ export class TaskService {
       });
     }
 
-    // Notification 2: Agar task ka status change hua hai to creator & assignee ko notify karein
-    if (data.status && data.status !== task.status) {
+    // CASE 5: Notification when Task is unassigned from previous assignee
+    if (
+      task.assigneeId &&
+      data.assigneeId !== undefined &&
+      data.assigneeId !== task.assigneeId &&
+      task.assigneeId !== user.id
+    ) {
+      await NotificationService.createNotification({
+        userId: task.assigneeId,
+        type: NotificationType.TASK_UNASSIGNED,
+        title: "Unassigned from Task",
+        message: `You were unassigned from task: "${task.title}"`,
+        projectId: task.projectId,
+        taskId: task.id,
+      });
+    }
+
+    // CASE 4: Notification on Task Status or Priority Update
+    const isStatusChanged = data.status && data.status !== task.status;
+    const isPriorityChanged = data.priority && data.priority !== task.priority;
+
+    if (isStatusChanged || isPriorityChanged) {
       const recipients = new Set<string>();
-      if (task.creatorId && task.creatorId !== user.id)
+      if (task.creatorId && task.creatorId !== user.id) {
         recipients.add(task.creatorId);
-      if (task.assigneeId && task.assigneeId !== user.id)
-        recipients.add(task.assigneeId);
+      }
+      if (updatedTask.assigneeId && updatedTask.assigneeId !== user.id) {
+        recipients.add(updatedTask.assigneeId);
+      }
+
+      const updateMsg = isStatusChanged
+        ? `Task "${updatedTask.title}" status changed to ${updatedTask.status}`
+        : `Task "${updatedTask.title}" priority changed to ${updatedTask.priority}`;
 
       for (const recipientId of recipients) {
         await NotificationService.createNotification({
           userId: recipientId,
           type: NotificationType.TASK_STATUS_CHANGED,
-          title: "Task Status Updated",
-          message: `Task "${updatedTask.title}" status changed to ${updatedTask.status}`,
+          title: isStatusChanged ? "Task Status Updated" : "Task Updated",
+          message: updateMsg,
           projectId: task.projectId,
           taskId: task.id,
         });
@@ -309,7 +314,6 @@ export class TaskService {
   static async deleteTask(id: string, user: CurrentUser) {
     const task = await this.getTaskById(id, user);
 
-    // Delete karne ke liye kam az kam MEMBER hona zaroori hai
     await assertProjectAccess(task.projectId, user, ProjectRole.MEMBER);
 
     await prisma.task.update({
@@ -317,7 +321,6 @@ export class TaskService {
       data: { isDeleted: true },
     });
 
-    // Real-Time Event: Task delete hone par board se hatayein
     emitToProject(task.projectId, "task:deleted", {
       id,
       projectId: task.projectId,

@@ -38,6 +38,8 @@ enum NotificationType {
   TASK_STATUS_CHANGED
   COMMENT_ADDED
   PROJECT_INVITATION
+  PROJECT_REMOVED
+  TASK_UNASSIGNED
 }
 
 model Organization {
