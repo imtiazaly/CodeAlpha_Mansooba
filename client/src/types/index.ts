@@ -9,13 +9,23 @@ export type NotificationType =
   | "COMMENT_ADDED"
   | "PROJECT_INVITATION"
   | "PROJECT_REMOVED"
-  | "TASK_UNASSIGNED";
+  | "TASK_UNASSIGNED"
+  | "WORKSPACE_INVITATION";
 
 // Organization
 export interface Organization {
   id: string;
   name: string;
   slug: string;
+}
+
+export interface WorkspaceInvitation {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  role: Role;
+  invitedAt: string;
 }
 
 // User

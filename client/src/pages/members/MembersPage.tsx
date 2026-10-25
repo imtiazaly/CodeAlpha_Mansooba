@@ -87,7 +87,6 @@ export const MembersPage = () => {
   const adminCount = members.filter((m) => m.role === "ADMIN").length;
   const userCount = members.filter((m) => m.role === "USER").length;
 
-  // Reset invite modal
   const resetInviteModal = () => {
     setInviteEmail("");
     setInviteName("");
@@ -97,7 +96,6 @@ export const MembersPage = () => {
     setIsInviteOpen(false);
   };
 
-  // Email lookup (check if user already exists)
   const handleEmailLookup = async () => {
     const emailToSearch = inviteEmail.trim().toLowerCase();
     if (!emailToSearch) return;
@@ -129,22 +127,26 @@ export const MembersPage = () => {
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Existing user case: only email needed
+    // Existing user case
     if (foundUser) {
       try {
         setIsInviting(true);
         await apiClient.post("/users/invite", {
           name: foundUser.name,
           email: foundUser.email,
+          role: inviteRole,
         });
+
         toast.success(
-          `${foundUser.name} has been added to your workspace! They can switch to this workspace from their account.`,
+          `Invitation sent to ${foundUser.name} as ${
+            inviteRole === "ADMIN" ? "Administrator" : "Member"
+          }! They will see it on their dashboard.`,
           { duration: 5000 },
         );
         resetInviteModal();
         queryClient.invalidateQueries({ queryKey: ["organization-members"] });
       } catch (err: any) {
-        toast.error(err.response?.data?.message || "Failed to add member");
+        toast.error(err.response?.data?.message || "Failed to invite member");
       } finally {
         setIsInviting(false);
       }
@@ -164,6 +166,7 @@ export const MembersPage = () => {
         email: inviteEmail.trim().toLowerCase(),
         role: inviteRole,
       });
+
       toast.success(`${inviteName} has been added to your workspace!`);
       resetInviteModal();
       queryClient.invalidateQueries({ queryKey: ["organization-members"] });
@@ -312,7 +315,7 @@ export const MembersPage = () => {
                 <thead>
                   <tr className="bg-[#18181b]/70 border-b border-[#27272a] text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
                     <th className="py-3 px-4">Member</th>
-                    <th className="py-3 px-4 w-32">System Role</th>
+                    <th className="py-3 px-4 w-32">Workspace Role</th>
                     <th className="py-3 px-4">
                       {isAdmin ? "Assigned Projects" : "Shared Projects"}
                     </th>
@@ -470,7 +473,7 @@ export const MembersPage = () => {
         )}
       </div>
 
-      {/* ── Invite Modal ── */}
+      {/* ── Invite Modal with Role Selection ── */}
       {isInviteOpen && (
         <div
           onClick={(e) => {
@@ -490,8 +493,8 @@ export const MembersPage = () => {
               Add Member to Workspace
             </h3>
             <p className="text-xs text-zinc-400 mb-5">
-              Enter an email address. Existing Mansooba users will be directly
-              added to your workspace.
+              Enter an email address to invite existing users or create a new
+              team member.
             </p>
 
             <form onSubmit={handleInvite} className="space-y-4">
@@ -529,38 +532,55 @@ export const MembersPage = () => {
                 </div>
               </div>
 
-              {/* Result: Existing User Found */}
+              {/* Result: Existing User Found + ROLE SELECTION */}
               {emailChecked && foundUser && (
-                <div className="p-3 bg-emerald-950/20 border border-emerald-500/25 rounded-lg flex items-start gap-3">
-                  <UserCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-emerald-300">
-                      Existing Mansooba User Found
-                    </p>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">
-                      <span className="text-zinc-200 font-medium">
-                        {foundUser.name}
-                      </span>{" "}
-                      ({foundUser.email})
-                    </p>
-                    <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
-                      <Info className="w-3 h-3" />
-                      They will be added to your workspace. Their active
-                      workspace won't change — they can switch using the
-                      workspace switcher.
-                    </p>
+                <div className="space-y-3">
+                  <div className="p-3 bg-emerald-950/20 border border-emerald-500/25 rounded-lg flex items-start gap-3">
+                    <UserCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-emerald-300">
+                        Existing Mansooba User Found
+                      </p>
+                      <p className="text-[11px] text-zinc-300 mt-0.5">
+                        <span className="font-semibold">{foundUser.name}</span>{" "}
+                        ({foundUser.email})
+                      </p>
+                      <p className="text-[10px] text-zinc-400 mt-1">
+                        They will receive an invitation on their dashboard and
+                        can choose to Accept or Decline.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Role Selection for Existing User */}
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                      Assign Workspace Role *
+                    </label>
+                    <select
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value as Role)}
+                      className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="USER">
+                        Standard Member (Access to assigned projects)
+                      </option>
+                      <option value="ADMIN">
+                        Administrator (Full workspace management)
+                      </option>
+                    </select>
                   </div>
                 </div>
               )}
 
-              {/* Result: New User (show name + role fields) */}
+              {/* Result: New User (Full Name + Role) */}
               {emailChecked && !foundUser && (
                 <>
                   <div className="p-3 bg-blue-950/20 border border-blue-500/20 rounded-lg flex items-start gap-2">
                     <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                     <p className="text-[11px] text-zinc-400">
-                      No existing user found with this email. A new account will
-                      be created with the default password{" "}
+                      No existing account found. A new account will be created
+                      with default password{" "}
                       <code className="text-zinc-300">Password123!</code>
                     </p>
                   </div>
@@ -581,7 +601,7 @@ export const MembersPage = () => {
 
                   <div>
                     <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                      System Role
+                      Workspace Role *
                     </label>
                     <select
                       value={inviteRole}
@@ -615,7 +635,7 @@ export const MembersPage = () => {
                   {isInviting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : foundUser ? (
-                    "Add to Workspace"
+                    "Send Workspace Invitation"
                   ) : (
                     "Create & Add Member"
                   )}

@@ -11,6 +11,7 @@ const TYPE_ICONS: Record<string, string> = {
   PROJECT_INVITATION: "📁",
   PROJECT_REMOVED: "🚪",
   TASK_UNASSIGNED: "👤",
+  WORKSPACE_INVITATION: "🏢",
 };
 
 export const InboxPage = () => {
