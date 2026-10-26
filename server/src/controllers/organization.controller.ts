@@ -37,7 +37,7 @@ export class OrganizationController {
   // POST /organizations/invitations/:id/respond
   static respondToInvitation = asyncHandler(
     async (req: Request, res: Response) => {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { action } = req.body;
 
       if (!action || (action !== "ACCEPT" && action !== "DECLINE")) {
@@ -81,6 +81,29 @@ export class OrganizationController {
         .status(200)
         .json(
           new ApiResponse(200, updatedUser, "Workspace switched successfully"),
+        );
+    },
+  );
+
+  // POST /organizations
+  static createOrganization = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { name } = req.body;
+      if (!name || typeof name !== "string") {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, null, "Organization name is required"));
+      }
+
+      const result = await OrganizationService.createOrganization(
+        req.user!.id,
+        name,
+      );
+
+      res
+        .status(201)
+        .json(
+          new ApiResponse(201, result, "Organization created successfully"),
         );
     },
   );
