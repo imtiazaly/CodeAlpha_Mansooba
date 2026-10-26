@@ -21,4 +21,7 @@ router.post(
 // PATCH /api/v1/organizations/switch
 router.patch("/switch", OrganizationController.switchOrganization);
 
+// POST /api/v1/organizations (Create new organization for logged-in user)
+router.post("/", OrganizationController.createOrganization);
+
 export const organizationRoutes = router;
