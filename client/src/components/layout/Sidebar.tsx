@@ -1,6 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
-  Layers,
   LayoutDashboard,
   CheckSquare,
   Bell,
@@ -25,6 +24,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../api/axios";
 import type { Notification } from "../../types";
+import { MansoobaLogo } from "../common/MansoobaLogo";
 
 interface SidebarProps {
   onOpenCreateProject?: () => void;
@@ -94,17 +94,9 @@ export const Sidebar = ({ onOpenCreateProject }: SidebarProps) => {
           <Link
             to="/"
             onClick={handleNavClick}
-            className="flex items-center gap-2.5 overflow-hidden"
+            className="flex items-center gap-2 overflow-hidden"
           >
-            <div className="w-7 h-7 rounded-lg bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-              <Layers className="w-4 h-4 text-indigo-400" />
-            </div>
-            <span className="font-semibold text-sm tracking-tight text-zinc-100 truncate">
-              Mansooba
-            </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 shrink-0">
-              v1.0
-            </span>
+            <MansoobaLogo size="sm" badge="v1.0" />
           </Link>
 
           <div className="flex items-center gap-1">

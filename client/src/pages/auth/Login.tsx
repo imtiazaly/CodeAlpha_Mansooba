@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { Layers, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { apiClient } from "../../api/axios";
 import { useAppDispatch } from "../../store";
 import { setCredentials } from "../../store/slices/authSlice";
 import { connectSocket } from "../../lib/socket";
 import type { ApiResponse, User } from "../../types";
+import { MansoobaLogo } from "../../components/common/MansoobaLogo";
 
 export const Login = () => {
   const [email, setEmail] = useState("");
@@ -56,9 +57,7 @@ export const Login = () => {
       <div className="w-full max-w-100">
         {/* Brand Header */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-11 h-11 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mb-3">
-            <Layers className="w-6 h-6 text-indigo-500" />
-          </div>
+          <MansoobaLogo size="xl" showWordmark={false} className="mb-4" />
           <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">
             Sign in to Mansooba
           </h1>

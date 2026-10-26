@@ -3,7 +3,6 @@ import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  Layers,
   ArrowRight,
   Loader2,
   Building2,
@@ -16,6 +15,7 @@ import { useAppDispatch } from "../../store";
 import { setCredentials } from "../../store/slices/authSlice";
 import { connectSocket } from "../../lib/socket";
 import type { ApiResponse, User } from "../../types";
+import { MansoobaLogo } from "../../components/common/MansoobaLogo";
 
 type Step = 1 | 2;
 
@@ -106,9 +106,7 @@ export const Register = () => {
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-11 h-11 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mb-3">
-            <Layers className="w-6 h-6 text-indigo-500" />
-          </div>
+          <MansoobaLogo size="xl" showWordmark={false} className="mb-4" />
           <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">
             {step === 1 ? "Create your account" : "Set up your workspace"}
           </h1>
