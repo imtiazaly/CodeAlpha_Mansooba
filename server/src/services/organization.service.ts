@@ -165,11 +165,19 @@ export class OrganizationService {
       );
     }
 
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { ownerId: true },
+    });
+
+    const isOwner = org?.ownerId === userId;
+    const finalRole = isOwner ? Role.ADMIN : membership.role;
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         organizationId,
-        role: membership.role,
+        role: finalRole,
       },
       select: {
         id: true,
