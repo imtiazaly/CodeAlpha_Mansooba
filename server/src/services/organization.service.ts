@@ -3,6 +3,16 @@ import { prisma } from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import { NotificationService } from "./notification.service.js";
 
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 50);
+};
+
 export class OrganizationService {
   // 1. User ki active (ACCEPTED) organizations fetch karo
   static async getMyOrganizations(userId: string) {
@@ -193,5 +203,69 @@ export class OrganizationService {
     });
 
     return updatedUser;
+  }
+
+  // 5. Nayi organization create karo (Existing logged-in user ke liye)
+  static async createOrganization(userId: string, organizationName: string) {
+    const trimmed = organizationName?.trim();
+    if (!trimmed || trimmed.length < 2) {
+      throw new ApiError(
+        400,
+        "Organization name must be at least 2 characters",
+      );
+    }
+
+    let slug = generateSlug(trimmed);
+    const existingSlug = await prisma.organization.findUnique({
+      where: { slug },
+    });
+    if (existingSlug) {
+      slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Organization banao jiska owner ye user hai
+      const organization = await tx.organization.create({
+        data: {
+          name: trimmed,
+          slug,
+          ownerId: userId,
+        },
+      });
+
+      // 2. User ki membership ADMIN ke sath create karo
+      await tx.userOrganizationMembership.create({
+        data: {
+          userId,
+          organizationId: organization.id,
+          role: Role.ADMIN,
+          status: MembershipStatus.ACCEPTED,
+        },
+      });
+
+      // 3. User ka active workspace aur role update karo
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          organizationId: organization.id,
+          role: Role.ADMIN,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          organizationId: true,
+          organization: {
+            select: { id: true, name: true, slug: true },
+          },
+          createdAt: true,
+        },
+      });
+
+      return { organization, user: updatedUser };
+    });
+
+    return result;
   }
 }
