@@ -36,6 +36,7 @@ interface MemberItem {
   name: string;
   email: string;
   role: Role;
+  isOwner?: boolean;
   createdAt: string;
   totalTasks: number | null;
   totalProjects: number | null;
@@ -412,11 +413,17 @@ export const MembersPage = () => {
 
                         {/* 2. Workspace Role Badge */}
                         <td className="py-3 px-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${m.role === "ADMIN" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-zinc-800/80 text-zinc-300 border-zinc-700/60"}`}
-                          >
-                            {m.role === "ADMIN" ? "ADMIN" : "MEMBER"}
-                          </span>
+                          {m.isOwner ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono border bg-amber-500/15 text-amber-300 border-amber-500/30 font-semibold shadow-sm">
+                              👑 OWNER
+                            </span>
+                          ) : (
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${m.role === "ADMIN" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-zinc-800/80 text-zinc-300 border-zinc-700/60"}`}
+                            >
+                              {m.role === "ADMIN" ? "ADMIN" : "MEMBER"}
+                            </span>
+                          )}
                         </td>
 
                         {/* 3. Projects */}
@@ -535,6 +542,10 @@ export const MembersPage = () => {
                             {isSelf ? (
                               <span className="text-[10px] text-zinc-600 italic">
                                 No action
+                              </span>
+                            ) : m.isOwner ? (
+                              <span className="text-[10px] text-amber-500/70 font-mono italic">
+                                Workspace Owner
                               </span>
                             ) : (
                               <div className="flex items-center justify-end gap-1.5">
