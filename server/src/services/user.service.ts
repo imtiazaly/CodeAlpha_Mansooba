@@ -222,6 +222,18 @@ export class UserService {
       );
     }
 
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { ownerId: true },
+    });
+
+    if (org?.ownerId === targetUserId) {
+      throw new ApiError(
+        400,
+        "The organization owner cannot be removed from their own organization.",
+      );
+    }
+
     const membership = await prisma.userOrganizationMembership.findUnique({
       where: {
         userId_organizationId: {
