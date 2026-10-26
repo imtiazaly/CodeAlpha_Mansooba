@@ -73,7 +73,7 @@ export const Dashboard = () => {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["projects"],
+    queryKey: ["projects", currentUser?.organizationId],
     queryFn: async () => {
       const res = await apiClient.get<ApiResponse<Project[]>>("/projects");
       return res.data.data;

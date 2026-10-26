@@ -44,35 +44,10 @@ export class ProjectService {
       ? { organizationId: user.organizationId }
       : {};
 
-    if (user.role === Role.ADMIN) {
-      return prisma.project.findMany({
-        where: {
-          isDeleted: false,
-          ...orgFilter,
-        },
-        include: {
-          owner: { select: { id: true, name: true, email: true } },
-          members: {
-            include: {
-              user: { select: { id: true, name: true, email: true } },
-            },
-          },
-          _count: {
-            select: {
-              members: true,
-              tasks: { where: { isDeleted: false } },
-            },
-          },
-        },
-      });
-    }
-
-    // Regular user: sirf apni org ke projects + member hona zaroori
     return prisma.project.findMany({
       where: {
         isDeleted: false,
-        ...orgFilter, // ← Org isolation for USER
-        members: { some: { userId: user.id } },
+        ...orgFilter,
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -88,6 +63,7 @@ export class ProjectService {
           },
         },
       },
+      orderBy: { createdAt: "desc" },
     });
   }
 
